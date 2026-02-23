@@ -20,28 +20,51 @@
     #dropZone .main-text { font-size: 17px; font-weight: bold; color: #333; }
     #dropZone .sub-text  { font-size: 13px; color: #888; margin-top: 4px; }
     #fileInput { display: none; }
-    .controls {
-      display: flex; align-items: center; gap: 12px;
-      background: #fff; border-radius: 12px; padding: 14px 16px;
-      margin-bottom: 16px; flex-wrap: wrap;
-    }
-    .controls label { font-size: 15px; font-weight: bold; white-space: nowrap; }
-    .controls input[type="number"] {
-      width: 90px; padding: 10px; font-size: 20px; font-weight: bold;
-      border: 2px solid #ccc; border-radius: 8px; text-align: center;
-    }
-    .controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
-    .controls .unit       { font-size: 16px; color: #555; }
-    .controls .hint-small { font-size: 12px; color: #999; }
-    .status { font-size: 13px; color: #555; margin-bottom: 8px; min-height: 18px; }
-    .error  { color: #c00; }
-    #dlBtn {
-      display: none; margin-bottom: 12px;
-      padding: 12px 24px; font-size: 15px;
-      background: #34c759; color: #fff;
-      border: none; border-radius: 10px; cursor: pointer; text-decoration: none;
-    }
-    #outImg { width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; display: none; }
+
+```
+.controls {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border-radius: 12px; padding: 14px 16px;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.controls label { font-size: 15px; font-weight: bold; white-space: nowrap; }
+.controls input[type="number"] {
+  width: 90px; padding: 10px; font-size: 20px; font-weight: bold;
+  border: 2px solid #ccc; border-radius: 8px; text-align: center;
+}
+.controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
+.controls .unit       { font-size: 16px; color: #555; }
+.controls .hint-small { font-size: 12px; color: #999; }
+
+/* 向きトグルボタン */
+#orientBtn {
+  display: flex; align-items: center; gap: 8px;
+  background: #fff; border-radius: 12px; padding: 12px 16px;
+  margin-bottom: 12px; border: 2px solid #ddd; cursor: pointer;
+  font-size: 15px; font-weight: bold; color: #333;
+  transition: border-color 0.2s, background 0.2s;
+  width: 100%;
+}
+#orientBtn:hover { border-color: #0071e3; }
+#orientBtn .icon-wrap {
+  font-size: 28px; line-height: 1;
+  transition: transform 0.3s ease;
+}
+#orientBtn.landscape .icon-wrap { transform: rotate(90deg); }
+#orientBtn .label-main { font-size: 15px; font-weight: bold; }
+#orientBtn .label-sub  { font-size: 12px; color: #888; margin-left: 4px; }
+
+.status { font-size: 13px; color: #555; margin-bottom: 8px; min-height: 18px; }
+.error  { color: #c00; }
+#dlBtn {
+  display: none; margin-bottom: 12px;
+  padding: 12px 24px; font-size: 15px;
+  background: #34c759; color: #fff;
+  border: none; border-radius: 10px; cursor: pointer; text-decoration: none;
+}
+#outImg { width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; display: none; }
+```
+
   </style>
 </head>
 <body>
@@ -61,6 +84,14 @@
     <span class="hint-small">変更すると自動で再生成します</span>
   </div>
 
+  <!-- 向き切り替えボタン -->
+
+  <button id="orientBtn">
+    <span class="icon-wrap">📱</span>
+    <span class="label-main" id="orientLabel">長辺：縦</span>
+    <span class="label-sub">タップで横に切り替え</span>
+  </button>
+
   <p class="status" id="status">画像を選択すると自動で生成します</p>
   <a id="dlBtn" download="stencil_a4.png">💾 PNG を保存</a>
   <img id="outImg" alt="output" />
@@ -68,9 +99,38 @@
   <script>
     'use strict';
 
-    const DPI    = 300;
-    const $id    = (id) => document.getElementById(id);
+    const DPI = 300;
+    const $id = (id) => document.getElementById(id);
 
+    // --- 向き状態 ---
+    // forceRotate: null=自動（横長画像だけ回転）, 'portrait'=強制縦, 'landscape'=強制横
+    // ボタンで切り替えるのは「長辺を縦 or 横」
+    // true = 長辺を縦にする（= 横長画像を90度回転して縦にする、縦長はそのまま）
+    // false = 長辺を横にする（= 縦長画像を90度回転して横にする、横長はそのまま）
+    let longSideVertical = true; // デフォルト：長辺縦
+
+    const orientBtn   = $id('orientBtn');
+    const orientLabel = $id('orientLabel');
+
+    orientBtn.addEventListener('click', () => {
+      longSideVertical = !longSideVertical;
+      updateOrientBtn();
+      if (currentDataURL) scheduleGenerate();
+    });
+
+    function updateOrientBtn() {
+      if (longSideVertical) {
+        orientBtn.classList.remove('landscape');
+        orientLabel.textContent = '長辺：縦';
+        orientBtn.querySelector('.label-sub').textContent = 'タップで横に切り替え';
+      } else {
+        orientBtn.classList.add('landscape');
+        orientLabel.textContent = '長辺：横';
+        orientBtn.querySelector('.label-sub').textContent = 'タップで縦に切り替え';
+      }
+    }
+
+    // --- ドロップゾーン ---
     const dropZone  = $id('dropZone');
     const fileInput = $id('fileInput');
 
@@ -124,129 +184,80 @@
       });
     }
 
+    // rotate: true = 90度回転して描画
     function drawImageTransformed(ctx, img, x, y, w, h, rotate) {
       ctx.save();
       ctx.translate(x + w / 2, y + h / 2);
       if (rotate) ctx.rotate(Math.PI / 2);
-      ctx.scale(-1, 1);
+      ctx.scale(-1, 1); // 左右反転固定
       const dw = rotate ? h : w;
       const dh = rotate ? w : h;
       ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
       ctx.restore();
     }
 
-    /**
-     * ルーラーを描画する
-     * rulerW : ルーラー帯の幅(px)  ← 左ルーラー用
-     * rulerH : ルーラー帯の高さ(px) ← 上ルーラー用
-     * originX, originY : コンテンツ領域の左上（ルーラーの0の位置）
-     */
     function drawRulers(ctx, originX, originY, contentW, contentH, rulerSize) {
       const oneCm     = cmToPx(1);
       const halfCm    = cmToPx(0.5);
-      const tickLong  = rulerSize * 0.55;  // 1cm目盛りの長さ
-      const tickShort = rulerSize * 0.30;  // 5mm目盛りの長さ
+      const tickLong  = rulerSize * 0.55;
+      const tickShort = rulerSize * 0.30;
       const fontSize  = Math.max(10, Math.round(rulerSize * 0.38));
 
       ctx.save();
-      ctx.strokeStyle = '#444';
-      ctx.fillStyle   = '#444';
-      ctx.lineWidth   = Math.max(1, Math.round(cmToPx(0.02)));
-      ctx.font        = `${fontSize}px sans-serif`;
+      ctx.lineWidth = Math.max(1, Math.round(cmToPx(0.02)));
+      ctx.font      = `${fontSize}px sans-serif`;
 
-      // ===== 上部ルーラー（横方向）=====
-      // 背景
+      // 上部ルーラー
       ctx.fillStyle = '#f0f0f0';
       ctx.fillRect(originX, 0, contentW, rulerSize);
-      ctx.fillStyle = '#444';
+      ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
+      ctx.beginPath(); ctx.moveTo(originX, rulerSize); ctx.lineTo(originX + contentW, rulerSize); ctx.stroke();
 
-      // ベースライン（ルーラー下端）
-      ctx.beginPath();
-      ctx.moveTo(originX, rulerSize);
-      ctx.lineTo(originX + contentW, rulerSize);
-      ctx.stroke();
-
-      // 目盛り：0から21cmまで（コンテンツ幅内）
-      const hMaxCm = Math.ceil(contentW / oneCm) + 1;
       for (let i = 0; i * oneCm <= contentW + 1; i++) {
         const x = originX + i * oneCm;
         if (x > originX + contentW + 1) break;
-
-        // 1cm目盛り（長い）
-        ctx.beginPath();
-        ctx.moveTo(x, rulerSize);
-        ctx.lineTo(x, rulerSize - tickLong);
-        ctx.stroke();
-
-        // 数字ラベル（反転して表示）
+        ctx.beginPath(); ctx.moveTo(x, rulerSize); ctx.lineTo(x, rulerSize - tickLong); ctx.stroke();
         if (i > 0) {
           ctx.save();
           ctx.translate(x, rulerSize - tickLong - fontSize * 0.1);
-          ctx.scale(-1, 1); // 左右反転
-          ctx.textAlign    = 'center';
-          ctx.textBaseline = 'bottom';
+          ctx.scale(-1, 1);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
           ctx.fillText(String(i), 0, 0);
           ctx.restore();
         }
-
-        // 5mm目盛り（短い）
         const x5 = x + halfCm;
         if (x5 <= originX + contentW) {
-          ctx.beginPath();
-          ctx.moveTo(x5, rulerSize);
-          ctx.lineTo(x5, rulerSize - tickShort);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x5, rulerSize); ctx.lineTo(x5, rulerSize - tickShort); ctx.stroke();
         }
       }
 
-      // ===== 左側ルーラー（縦方向）=====
-      // 背景
+      // 左側ルーラー
       ctx.fillStyle = '#f0f0f0';
       ctx.fillRect(0, originY, rulerSize, contentH);
-      ctx.fillStyle = '#444';
+      ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
+      ctx.beginPath(); ctx.moveTo(rulerSize, originY); ctx.lineTo(rulerSize, originY + contentH); ctx.stroke();
 
-      // ベースライン（ルーラー右端）
-      ctx.beginPath();
-      ctx.moveTo(rulerSize, originY);
-      ctx.lineTo(rulerSize, originY + contentH);
-      ctx.stroke();
-
-      // 目盛り
       for (let i = 0; i * oneCm <= contentH + 1; i++) {
         const y = originY + i * oneCm;
         if (y > originY + contentH + 1) break;
-
-        // 1cm目盛り（長い）
-        ctx.beginPath();
-        ctx.moveTo(rulerSize, y);
-        ctx.lineTo(rulerSize - tickLong, y);
-        ctx.stroke();
-
-        // 数字ラベル（縦書き風に90度回転）
+        ctx.beginPath(); ctx.moveTo(rulerSize, y); ctx.lineTo(rulerSize - tickLong, y); ctx.stroke();
         if (i > 0) {
           ctx.save();
           ctx.translate(rulerSize - tickLong - fontSize * 0.15, y);
           ctx.rotate(-Math.PI / 2);
-          ctx.textAlign    = 'center';
-          ctx.textBaseline = 'bottom';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
           ctx.fillText(String(i), 0, 0);
           ctx.restore();
         }
-
-        // 5mm目盛り（短い）
         const y5 = y + halfCm;
         if (y5 <= originY + contentH) {
-          ctx.beginPath();
-          ctx.moveTo(rulerSize, y5);
-          ctx.lineTo(rulerSize - tickShort, y5);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(rulerSize, y5); ctx.lineTo(rulerSize - tickShort, y5); ctx.stroke();
         }
       }
 
-      // 左上コーナー（交差部を塗りつぶし）
+      // 左上コーナー
       ctx.fillStyle = '#e0e0e0';
       ctx.fillRect(0, 0, rulerSize, rulerSize);
-
       ctx.restore();
     }
 
@@ -267,10 +278,26 @@
         const ih  = img.naturalHeight;
         if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
 
-        const rotate   = iw > ih;
-        const effW     = rotate ? ih : iw;
-        const effH     = rotate ? iw : ih;
-        const longEdge = effH;
+        // --- 向き計算 ---
+        // longSideVertical=true  → 長辺が縦になるよう配置
+        //   縦長(ih>=iw): そのまま(rotate=false)
+        //   横長(iw>ih) : 90度回転(rotate=true)
+        // longSideVertical=false → 長辺が横になるよう配置
+        //   横長(iw>ih) : そのまま(rotate=false)
+        //   縦長(ih>=iw): 90度回転(rotate=true)
+        const isPortrait = ih >= iw; // 元画像が縦長か
+        let rotate;
+        if (longSideVertical) {
+          rotate = !isPortrait; // 横長なら回転して縦に
+        } else {
+          rotate = isPortrait;  // 縦長なら回転して横に
+        }
+
+        // 回転後の実効サイズ
+        const effW = rotate ? ih : iw;
+        const effH = rotate ? iw : ih;
+        // 長辺（基準にする辺）
+        const longEdge = Math.max(effW, effH);
 
         const canvas  = document.createElement('canvas');
         canvas.width  = PAGE_W;
@@ -282,17 +309,13 @@
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        // ルーラーサイズ = margin と同じ 10mm
         const rulerSize = Math.round(cmToPx(1.0));
         const gap       = Math.round(cmToPx(0.5));
+        const originX   = rulerSize;
+        const originY   = rulerSize;
+        const contentW  = PAGE_W - rulerSize * 2;
+        const contentH  = PAGE_H - rulerSize * 2;
 
-        // コンテンツ領域（ルーラーの右・下から始まる）
-        const originX  = rulerSize;
-        const originY  = rulerSize;
-        const contentW = PAGE_W - rulerSize * 2; // 右端にも少し余白
-        const contentH = PAGE_H - rulerSize * 2;
-
-        // ルーラー描画（画像より先に描いて下に敷く）
         drawRulers(ctx, originX, originY, contentW, contentH, rulerSize);
 
         function drawSize(cm) {
@@ -300,13 +323,15 @@
           return { w: effW * scale, h: effH * scale };
         }
 
-        function tryLayout(nCols, sizes) {
-          const cellW = Math.floor((contentW - gap * (nCols - 1)) / nCols);
+        // nRows行・各行2枚横並びのレイアウトで全サイズが収まるか判定
+        function tryLayout(nRows, sizes) {
+          const cellW = Math.floor((contentW - gap) / 2);
+          const cellH = Math.floor((contentH - gap * (nRows - 1)) / nRows);
+          if (cellH <= 0) return null;
           for (const cm of sizes) {
             const ds = drawSize(cm);
-            if (ds.w > cellW + 0.5 || ds.h > contentH + 0.5) return null;
+            if (ds.w > cellW + 0.5 || ds.h > cellH + 0.5) return null;
           }
-          const cellH = Math.floor((contentH - gap) / 2);
           return { cellW, cellH };
         }
 
@@ -335,36 +360,35 @@
         }
 
         if (!bestLayout) {
-          bestLayout = { cellW: contentW, cellH: Math.floor((contentH - gap) / 2) };
+          bestLayout = { cellW: contentW, cellH: contentH };
           bestCms = [baseCm]; bestCount = 1; bestStep = 1.0;
         }
 
         const { cellW, cellH } = bestLayout;
-        const nCols = bestCount;
+        const nRows = bestCount;
 
-        const totalUsedW = nCols * cellW + (nCols - 1) * gap;
-        const offsetX    = originX + Math.floor((contentW - totalUsedW) / 2);
+        // 行グループ全体を垂直中央揃え
+        const totalUsedH = nRows * cellH + (nRows - 1) * gap;
+        const offsetY    = originY + Math.floor((contentH - totalUsedH) / 2);
 
         let someSingle = false;
 
-        for (let col = 0; col < nCols; col++) {
-          const cm    = bestCms[col];
-          const ds    = drawSize(cm);
-          const cellX = offsetX + col * (cellW + gap);
+        for (let row = 0; row < nRows; row++) {
+          const cm   = bestCms[row];
+          const ds   = drawSize(cm);
+          const rowY = offsetY + row * (cellH + gap);
 
-          const fitsDouble = (ds.h * 2 + gap) <= contentH + 0.5;
-          const nRows = fitsDouble ? 2 : 1;
-          if (nRows === 1) someSingle = true;
+          // 横2枚が収まるか
+          const fitsDouble = (ds.w * 2 + gap) <= contentW + 0.5;
+          const nCols = fitsDouble ? 2 : 1;
+          if (nCols === 1) someSingle = true;
 
-          for (let row = 0; row < nRows; row++) {
-            let dy;
-            if (nRows === 1) {
-              dy = originY + (contentH - ds.h) / 2;
-            } else {
-              const cellY = originY + row * (cellH + gap);
-              dy = cellY + (cellH - ds.h) / 2;
-            }
-            const dx = cellX + (cellW - ds.w) / 2;
+          const totalImgW = nCols === 2 ? ds.w * 2 + gap : ds.w;
+          const startX    = originX + Math.floor((contentW - totalImgW) / 2);
+
+          for (let col = 0; col < nCols; col++) {
+            const dx = startX + col * (ds.w + gap);
+            const dy = rowY + (cellH - ds.h) / 2;
             drawImageTransformed(ctx, img, dx, dy, ds.w, ds.h, rotate);
           }
         }
@@ -372,16 +396,11 @@
         // 基準サイズ注記（右下・反転）
         const noteFontSize = Math.max(10, Math.round(cmToPx(0.28)));
         const noteText     = `基準 ${baseCm.toFixed(1)}cm`;
-        const noteX = PAGE_W - rulerSize / 2;
-        const noteY = PAGE_H - rulerSize / 3;
-
         ctx.save();
-        ctx.font         = `${noteFontSize}px sans-serif`;
-        ctx.textBaseline = 'bottom';
-        ctx.fillStyle    = '#888';
-        ctx.translate(noteX, noteY);
-        ctx.scale(-1, 1);
-        ctx.textAlign = 'left';
+        ctx.font = `${noteFontSize}px sans-serif`;
+        ctx.textBaseline = 'bottom'; ctx.fillStyle = '#888';
+        ctx.translate(PAGE_W - rulerSize / 2, PAGE_H - rulerSize / 3);
+        ctx.scale(-1, 1); ctx.textAlign = 'left';
         ctx.fillText(noteText, 0, 0);
         ctx.restore();
 
@@ -391,10 +410,11 @@
         $id('dlBtn').href = dataUrl;
         $id('dlBtn').style.display = 'inline-block';
 
-        const stepLabel  = bestStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
-        const rotNote    = rotate     ? ' ／ 90°回転' : '';
-        const singleNote = someSingle ? ' ／ 一部1枚' : '';
-        showStatus(`完了 — ${nCols}種類 ${stepLabel}${rotNote}${singleNote}　` +
+        const stepLabel   = bestStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
+        const rotNote     = rotate     ? ' ／ 90°回転' : '';
+        const singleNote  = someSingle ? ' ／ 一部1枚' : '';
+        const orientNote  = longSideVertical ? '長辺縦' : '長辺横';
+        showStatus(`完了 — ${nRows}種類 ${stepLabel} ${orientNote}${rotNote}${singleNote}　` +
           bestCms.map(c => c.toFixed(1) + 'cm').join(' / '));
 
       } catch (err) {
