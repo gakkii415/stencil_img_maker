@@ -1,0 +1,320 @@
+<!doctype html>
+
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stencil A4 Maker (Local)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, sans-serif; padding: 16px; max-width: 800px; margin: 0 auto; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+    label.inline { flex-direction: row; align-items: center; gap: 6px; }
+    input[type="number"] { width: 100px; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+    input[type="file"] { max-width: 100%; font-size: 14px; }
+    input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+    #outImg { width: 100%; height: auto; border: 1px solid #ddd; margin-top: 16px; display: none; }
+    .hint { color: #555; font-size: 13px; line-height: 1.6; margin-top: 10px; background: #f8f8f8; padding: 10px 14px; border-radius: 8px; }
+    .status { font-size: 12px; color: #444; margin-top: 8px; min-height: 18px; }
+    .error { color: #c00; }
+    button { padding: 10px 20px; font-size: 15px; background: #0071e3; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    button:not(:disabled):hover { background: #005bb5; }
+    #dlBtn { display: none; margin-top: 10px; padding: 10px 20px; font-size: 15px; background: #34c759; color: #fff; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; }
+    #dlBtn:hover { background: #28a745; }
+  </style>
+</head>
+<body>
+  <h3 style="margin:0 0 12px 0;">Stencil A4 Maker（ローカル）</h3>
+
+  <div class="row">
+    <label>
+      画像を選択
+      <input id="file" type="file" accept="image/*" />
+    </label>
+    <label>
+      基準サイズ（cm）
+      <input id="baseCm" type="number" inputmode="decimal" min="0.1" max="25" step="0.1" value="7" />
+    </label>
+    <label>
+      出力 DPI
+      <input id="dpi" type="number" min="72" max="600" step="1" value="300" />
+    </label>
+    <label class="inline">
+      <input id="mirror" type="checkbox" checked />
+      左右反転
+    </label>
+    <button id="make">生成</button>
+  </div>
+
+  <div class="hint">
+    ・基準サイズを中心に最大5種類を自動配置します<br/>
+    ・4種類以上 → <b>0.5cm刻み</b>、3種類以下 → <b>1cm刻み</b><br/>
+    ・上下2枚が干渉する場合は1枚のみに自動調整します<br/>
+    ・横長の画像は自動で90度回転します<br/>
+    ・A4右下に基準サイズを記載します（反転あり時は文字も反転）
+  </div>
+
+  <p class="status" id="status"></p>
+  <a id="dlBtn" download="stencil_a4.png">💾 PNG を保存</a>
+  <img id="outImg" alt="output" />
+
+  <script>
+    'use strict';
+
+    const $id = (id) => document.getElementById(id);
+
+    function cmToPx(cm, dpi) { return (cm / 2.54) * dpi; }
+
+    function a4Px(dpi) {
+      return {
+        w: Math.round(cmToPx(21.0, dpi)),
+        h: Math.round(cmToPx(29.7, dpi)),
+      };
+    }
+
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = (e) => resolve(e.target.result);
+        reader.onerror = ()  => reject(new Error('ファイルの読み込みに失敗しました'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadImage(dataURL) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload  = () => resolve(img);
+        img.onerror = () => reject(new Error('画像のデコードに失敗しました'));
+        img.src = dataURL;
+      });
+    }
+
+    function showStatus(msg, isError = false) {
+      const el = $id('status');
+      el.textContent = msg;
+      el.className = 'status' + (isError ? ' error' : '');
+    }
+
+    /**
+     * 画像描画（90度回転 / 左右反転 対応）
+     * x,y,w,h は「回転後」の描画先矩形
+     */
+    function drawImageTransformed(ctx, img, x, y, w, h, mirror, rotate) {
+      ctx.save();
+      ctx.translate(x + w / 2, y + h / 2);
+      if (rotate) ctx.rotate(Math.PI / 2);
+      if (mirror) ctx.scale(-1, 1);
+      const dw = rotate ? h : w;
+      const dh = rotate ? w : h;
+      ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    }
+
+    async function generate() {
+      const fileInput = $id('file');
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) { showStatus('画像を選択してください', true); return; }
+
+      const baseCm = parseFloat($id('baseCm').value);
+      if (!Number.isFinite(baseCm) || baseCm <= 0) {
+        showStatus('基準サイズに正の数値を入力してください', true); return;
+      }
+
+      const dpi = parseInt($id('dpi').value, 10);
+      if (!Number.isInteger(dpi) || dpi < 72 || dpi > 600) {
+        showStatus('DPI は 72〜600 の整数で入力してください', true); return;
+      }
+
+      const mirror  = $id('mirror').checked;
+      const makeBtn = $id('make');
+      makeBtn.disabled = true;
+      showStatus('読み込み中…');
+
+      try {
+        const dataURL = await readFileAsDataURL(file);
+        showStatus('生成中…');
+
+        const img = await loadImage(dataURL);
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
+
+        // 横長なら90度回転して縦長として扱う
+        const rotate   = iw > ih;
+        const effW     = rotate ? ih : iw;
+        const effH     = rotate ? iw : ih;
+        const longEdge = effH; // 縦長なので高さが長辺
+
+        const { w: pageW, h: pageH } = a4Px(dpi);
+        const canvas  = document.createElement('canvas');
+        canvas.width  = pageW;
+        canvas.height = pageH;
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageW, pageH);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        // --- レイアウト定数 ---
+        const margin = Math.round(cmToPx(1.0, dpi)); // 余白 10mm
+        const gap    = Math.round(cmToPx(0.5, dpi)); // gap 5mm固定
+
+        const contentW = pageW - margin * 2;
+        const contentH = pageH - margin * 2;
+
+        // cm → 描画サイズ(px)
+        function drawSize(cm) {
+          const scale = cmToPx(cm, dpi) / longEdge;
+          return { w: effW * scale, h: effH * scale };
+        }
+
+        // nCols列レイアウトで sizes が収まるか（横方向のみ判定）
+        // 縦方向は後で各列ごとに判定するので、ここでは1枚分の高さで判定
+        function tryLayout(nCols, sizes) {
+          const cellW = Math.floor((contentW - gap * (nCols - 1)) / nCols);
+          const cellH = Math.floor((contentH - gap) / 2); // 2枚想定のセル高さ
+          for (const cm of sizes) {
+            const ds = drawSize(cm);
+            if (ds.w > cellW + 0.5 || ds.h > contentH + 0.5) return null; // 1枚でも縦に入らなければアウト
+          }
+          return { cellW, cellH };
+        }
+
+        function makeCandidates(step, count) {
+          const half = Math.floor(count / 2);
+          return Array.from({ length: count }, (_, i) => {
+            const offset = (i - half) * step;
+            return Math.max(0.1, Math.round((baseCm + offset) * 100) / 100);
+          });
+        }
+
+        const trySets = [
+          [5, 0.5],
+          [4, 0.5],
+          [5, 1.0],
+          [4, 1.0],
+          [3, 1.0],
+          [2, 1.0],
+          [1, 1.0],
+        ];
+
+        let bestLayout = null;
+        let bestCms    = null;
+        let bestStep   = 1.0;
+        let bestCount  = 1;
+
+        for (const [count, step] of trySets) {
+          const cms    = makeCandidates(step, count);
+          const layout = tryLayout(count, cms);
+          if (layout) {
+            bestLayout = layout;
+            bestCms    = cms;
+            bestStep   = step;
+            bestCount  = count;
+            break;
+          }
+        }
+
+        // 万一何も収まらなければ強制
+        if (!bestLayout) {
+          bestLayout = {
+            cellW: contentW,
+            cellH: Math.floor((contentH - gap) / 2),
+          };
+          bestCms   = [baseCm];
+          bestCount = 1;
+          bestStep  = 1.0;
+        }
+
+        const { cellW, cellH } = bestLayout;
+        const nCols = bestCount;
+
+        // 列全体を水平中央揃え
+        const totalUsedW = nCols * cellW + (nCols - 1) * gap;
+        const offsetX    = margin + Math.floor((contentW - totalUsedW) / 2);
+
+        // --- 各列を描画 ---
+        let someSingle = false;
+
+        for (let col = 0; col < nCols; col++) {
+          const cm    = bestCms[col];
+          const ds    = drawSize(cm);
+          const cellX = offsetX + col * (cellW + gap);
+
+          // 上下2枚置いたとき干渉しないか判定
+          // 画像高さ×2 + gap が contentH に収まればOK
+          const fitsDouble = (ds.h * 2 + gap) <= contentH + 0.5;
+          const nRows = fitsDouble ? 2 : 1;
+          if (nRows === 1) someSingle = true;
+
+          for (let row = 0; row < nRows; row++) {
+            let dy;
+            if (nRows === 1) {
+              // 縦中央に1枚
+              dy = margin + (contentH - ds.h) / 2;
+            } else {
+              const cellY = margin + row * (cellH + gap);
+              dy = cellY + (cellH - ds.h) / 2;
+            }
+            const dx = cellX + (cellW - ds.w) / 2;
+            drawImageTransformed(ctx, img, dx, dy, ds.w, ds.h, mirror, rotate);
+          }
+        }
+
+        // --- 基準サイズ注記（右下余白・mirror時は文字も反転）---
+        const noteFontSize = Math.max(10, Math.round(cmToPx(0.28, dpi)));
+        const noteText     = `基準 ${baseCm.toFixed(1)}cm`;
+        // 描画基準点（右下）
+        const noteX = pageW - margin / 2;
+        const noteY = pageH - margin / 3;
+
+        ctx.save();
+        ctx.font         = `${noteFontSize}px sans-serif`;
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle    = '#888';
+
+        if (mirror) {
+          // 基準点へ移動してX軸反転 → textAlign:left で右下に収まる
+          ctx.translate(noteX, noteY);
+          ctx.scale(-1, 1);
+          ctx.textAlign = 'left';
+          ctx.fillText(noteText, 0, 0);
+        } else {
+          ctx.textAlign = 'right';
+          ctx.fillText(noteText, noteX, noteY);
+        }
+        ctx.restore();
+
+        // --- 出力 ---
+        const dataUrl = canvas.toDataURL('image/png');
+        $id('outImg').src = dataUrl;
+        $id('outImg').style.display = 'block';
+        $id('dlBtn').href = dataUrl;
+        $id('dlBtn').style.display = 'inline-block';
+
+        const stepLabel   = bestStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
+        const rotateNote  = rotate     ? ' ／ 90°回転' : '';
+        const singleNote  = someSingle ? ' ／ 一部1枚のみ' : '';
+        showStatus(
+          `完了 — ${nCols}種類 ${stepLabel}${rotateNote}${singleNote}　` +
+          bestCms.map(c => c.toFixed(1) + 'cm').join(' / ') +
+          `　${pageW}×${pageH}px（${dpi}dpi）`
+        );
+
+      } catch (err) {
+        console.error(err);
+        showStatus('エラー：' + (err.message || '生成に失敗しました'), true);
+      } finally {
+        makeBtn.disabled = false;
+      }
+    }
+
+    $id('make').addEventListener('click', generate);
+  </script>
+
+</body>
+</html>
