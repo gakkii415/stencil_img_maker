@@ -8,61 +8,44 @@
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, system-ui, sans-serif; padding: 16px; max-width: 800px; margin: 0 auto; background: #f5f5f5; }
-
-
-h3 { margin: 0 0 14px 0; font-size: 18px; }
-
-/* ドロップゾーン */
-#dropZone {
-  border: 3px dashed #aaa;
-  border-radius: 14px;
-  background: #fff;
-  text-align: center;
-  padding: 36px 20px;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  margin-bottom: 16px;
-}
-#dropZone.over { border-color: #0071e3; background: #e8f0ff; }
-#dropZone.has-file { border-color: #34c759; background: #f0fff4; }
-#dropZone .icon { font-size: 48px; line-height: 1; margin-bottom: 8px; }
-#dropZone .main-text { font-size: 17px; font-weight: bold; color: #333; }
-#dropZone .sub-text  { font-size: 13px; color: #888; margin-top: 4px; }
-#fileInput { display: none; }
-
-/* 基準サイズ */
-.controls {
-  display: flex; align-items: center; gap: 12px;
-  background: #fff; border-radius: 12px; padding: 14px 16px;
-  margin-bottom: 16px; flex-wrap: wrap;
-}
-.controls label { font-size: 15px; font-weight: bold; white-space: nowrap; }
-.controls input[type="number"] {
-  width: 90px; padding: 10px; font-size: 20px; font-weight: bold;
-  border: 2px solid #ccc; border-radius: 8px; text-align: center;
-}
-.controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
-.controls .unit { font-size: 16px; color: #555; }
-.controls .hint-small { font-size: 12px; color: #999; }
-
-.status { font-size: 13px; color: #555; margin-bottom: 8px; min-height: 18px; }
-.error   { color: #c00; }
-
-#dlBtn {
-  display: none; margin-bottom: 12px;
-  padding: 12px 24px; font-size: 15px;
-  background: #34c759; color: #fff;
-  border: none; border-radius: 10px; cursor: pointer; text-decoration: none;
-}
-#outImg { width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; display: none; }
-
-
+    h3 { margin: 0 0 14px 0; font-size: 18px; }
+    #dropZone {
+      border: 3px dashed #aaa; border-radius: 14px; background: #fff;
+      text-align: center; padding: 36px 20px; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s; margin-bottom: 16px;
+    }
+    #dropZone.over     { border-color: #0071e3; background: #e8f0ff; }
+    #dropZone.has-file { border-color: #34c759; background: #f0fff4; }
+    #dropZone .icon      { font-size: 48px; line-height: 1; margin-bottom: 8px; }
+    #dropZone .main-text { font-size: 17px; font-weight: bold; color: #333; }
+    #dropZone .sub-text  { font-size: 13px; color: #888; margin-top: 4px; }
+    #fileInput { display: none; }
+    .controls {
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; border-radius: 12px; padding: 14px 16px;
+      margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .controls label { font-size: 15px; font-weight: bold; white-space: nowrap; }
+    .controls input[type="number"] {
+      width: 90px; padding: 10px; font-size: 20px; font-weight: bold;
+      border: 2px solid #ccc; border-radius: 8px; text-align: center;
+    }
+    .controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
+    .controls .unit       { font-size: 16px; color: #555; }
+    .controls .hint-small { font-size: 12px; color: #999; }
+    .status { font-size: 13px; color: #555; margin-bottom: 8px; min-height: 18px; }
+    .error  { color: #c00; }
+    #dlBtn {
+      display: none; margin-bottom: 12px;
+      padding: 12px 24px; font-size: 15px;
+      background: #34c759; color: #fff;
+      border: none; border-radius: 10px; cursor: pointer; text-decoration: none;
+    }
+    #outImg { width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; display: none; }
   </style>
 </head>
 <body>
   <h3>Stencil A4 Maker</h3>
-
-  <!-- ドロップゾーン -->
 
   <div id="dropZone">
     <div class="icon">🖼️</div>
@@ -70,8 +53,6 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
     <div class="sub-text">またはここにドラッグ＆ドロップ</div>
   </div>
   <input id="fileInput" type="file" accept="image/*" />
-
-  <!-- 基準サイズ -->
 
   <div class="controls">
     <label for="baseCm">基準サイズ（長辺）</label>
@@ -87,40 +68,22 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
   <script>
     'use strict';
 
-    const DPI = 300; // 固定
-    const MIRROR = true; // 左右反転固定
+    const DPI    = 300;
+    const $id    = (id) => document.getElementById(id);
 
-    const $id = (id) => document.getElementById(id);
-
-    // --- ドロップゾーン ---
     const dropZone  = $id('dropZone');
     const fileInput = $id('fileInput');
 
     dropZone.addEventListener('click', () => fileInput.click());
-
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.classList.add('over');
-    });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+    dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('over'));
     dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('over');
+      e.preventDefault(); dropZone.classList.remove('over');
       const f = e.dataTransfer.files[0];
       if (f && f.type.startsWith('image/')) handleFile(f);
     });
-
-    fileInput.addEventListener('change', () => {
-      const f = fileInput.files[0];
-      if (f) handleFile(f);
-    });
-
-    // 基準サイズ変更で再生成
-    $id('baseCm').addEventListener('input', () => {
-      if (currentDataURL) scheduleGenerate();
-    });
-
-    // ---
+    fileInput.addEventListener('change', () => { const f = fileInput.files[0]; if (f) handleFile(f); });
+    $id('baseCm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
 
     let currentDataURL = null;
     let generateTimer  = null;
@@ -130,14 +93,12 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
       dropZone.querySelector('.main-text').textContent = file.name;
       dropZone.querySelector('.sub-text').textContent  = '別の画像を選ぶにはタップ';
       showStatus('読み込み中…');
-
       const reader = new FileReader();
       reader.onload  = (e) => { currentDataURL = e.target.result; scheduleGenerate(); };
       reader.onerror = ()  => showStatus('ファイルの読み込みに失敗しました', true);
       reader.readAsDataURL(file);
     }
 
-    // 短時間に連続入力されても1回だけ生成
     function scheduleGenerate() {
       clearTimeout(generateTimer);
       generateTimer = setTimeout(generate, 300);
@@ -167,10 +128,125 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
       ctx.save();
       ctx.translate(x + w / 2, y + h / 2);
       if (rotate) ctx.rotate(Math.PI / 2);
-      ctx.scale(-1, 1); // 左右反転固定
+      ctx.scale(-1, 1);
       const dw = rotate ? h : w;
       const dh = rotate ? w : h;
       ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    }
+
+    /**
+     * ルーラーを描画する
+     * rulerW : ルーラー帯の幅(px)  ← 左ルーラー用
+     * rulerH : ルーラー帯の高さ(px) ← 上ルーラー用
+     * originX, originY : コンテンツ領域の左上（ルーラーの0の位置）
+     */
+    function drawRulers(ctx, originX, originY, contentW, contentH, rulerSize) {
+      const oneCm     = cmToPx(1);
+      const halfCm    = cmToPx(0.5);
+      const tickLong  = rulerSize * 0.55;  // 1cm目盛りの長さ
+      const tickShort = rulerSize * 0.30;  // 5mm目盛りの長さ
+      const fontSize  = Math.max(10, Math.round(rulerSize * 0.38));
+
+      ctx.save();
+      ctx.strokeStyle = '#444';
+      ctx.fillStyle   = '#444';
+      ctx.lineWidth   = Math.max(1, Math.round(cmToPx(0.02)));
+      ctx.font        = `${fontSize}px sans-serif`;
+
+      // ===== 上部ルーラー（横方向）=====
+      // 背景
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(originX, 0, contentW, rulerSize);
+      ctx.fillStyle = '#444';
+
+      // ベースライン（ルーラー下端）
+      ctx.beginPath();
+      ctx.moveTo(originX, rulerSize);
+      ctx.lineTo(originX + contentW, rulerSize);
+      ctx.stroke();
+
+      // 目盛り：0から21cmまで（コンテンツ幅内）
+      const hMaxCm = Math.ceil(contentW / oneCm) + 1;
+      for (let i = 0; i * oneCm <= contentW + 1; i++) {
+        const x = originX + i * oneCm;
+        if (x > originX + contentW + 1) break;
+
+        // 1cm目盛り（長い）
+        ctx.beginPath();
+        ctx.moveTo(x, rulerSize);
+        ctx.lineTo(x, rulerSize - tickLong);
+        ctx.stroke();
+
+        // 数字ラベル（反転して表示）
+        if (i > 0) {
+          ctx.save();
+          ctx.translate(x, rulerSize - tickLong - fontSize * 0.1);
+          ctx.scale(-1, 1); // 左右反転
+          ctx.textAlign    = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(String(i), 0, 0);
+          ctx.restore();
+        }
+
+        // 5mm目盛り（短い）
+        const x5 = x + halfCm;
+        if (x5 <= originX + contentW) {
+          ctx.beginPath();
+          ctx.moveTo(x5, rulerSize);
+          ctx.lineTo(x5, rulerSize - tickShort);
+          ctx.stroke();
+        }
+      }
+
+      // ===== 左側ルーラー（縦方向）=====
+      // 背景
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, originY, rulerSize, contentH);
+      ctx.fillStyle = '#444';
+
+      // ベースライン（ルーラー右端）
+      ctx.beginPath();
+      ctx.moveTo(rulerSize, originY);
+      ctx.lineTo(rulerSize, originY + contentH);
+      ctx.stroke();
+
+      // 目盛り
+      for (let i = 0; i * oneCm <= contentH + 1; i++) {
+        const y = originY + i * oneCm;
+        if (y > originY + contentH + 1) break;
+
+        // 1cm目盛り（長い）
+        ctx.beginPath();
+        ctx.moveTo(rulerSize, y);
+        ctx.lineTo(rulerSize - tickLong, y);
+        ctx.stroke();
+
+        // 数字ラベル（縦書き風に90度回転）
+        if (i > 0) {
+          ctx.save();
+          ctx.translate(rulerSize - tickLong - fontSize * 0.15, y);
+          ctx.rotate(-Math.PI / 2);
+          ctx.textAlign    = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(String(i), 0, 0);
+          ctx.restore();
+        }
+
+        // 5mm目盛り（短い）
+        const y5 = y + halfCm;
+        if (y5 <= originY + contentH) {
+          ctx.beginPath();
+          ctx.moveTo(rulerSize, y5);
+          ctx.lineTo(rulerSize - tickShort, y5);
+          ctx.stroke();
+        }
+      }
+
+      // 左上コーナー（交差部を塗りつぶし）
+      ctx.fillStyle = '#e0e0e0';
+      ctx.fillRect(0, 0, rulerSize, rulerSize);
+
       ctx.restore();
     }
 
@@ -206,11 +282,18 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        const margin = Math.round(cmToPx(1.0));
-        const gap    = Math.round(cmToPx(0.5));
+        // ルーラーサイズ = margin と同じ 10mm
+        const rulerSize = Math.round(cmToPx(1.0));
+        const gap       = Math.round(cmToPx(0.5));
 
-        const contentW = PAGE_W - margin * 2;
-        const contentH = PAGE_H - margin * 2;
+        // コンテンツ領域（ルーラーの右・下から始まる）
+        const originX  = rulerSize;
+        const originY  = rulerSize;
+        const contentW = PAGE_W - rulerSize * 2; // 右端にも少し余白
+        const contentH = PAGE_H - rulerSize * 2;
+
+        // ルーラー描画（画像より先に描いて下に敷く）
+        drawRulers(ctx, originX, originY, contentW, contentH, rulerSize);
 
         function drawSize(cm) {
           const scale = cmToPx(cm) / longEdge;
@@ -260,7 +343,7 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
         const nCols = bestCount;
 
         const totalUsedW = nCols * cellW + (nCols - 1) * gap;
-        const offsetX    = margin + Math.floor((contentW - totalUsedW) / 2);
+        const offsetX    = originX + Math.floor((contentW - totalUsedW) / 2);
 
         let someSingle = false;
 
@@ -276,9 +359,9 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
           for (let row = 0; row < nRows; row++) {
             let dy;
             if (nRows === 1) {
-              dy = margin + (contentH - ds.h) / 2;
+              dy = originY + (contentH - ds.h) / 2;
             } else {
-              const cellY = margin + row * (cellH + gap);
+              const cellY = originY + row * (cellH + gap);
               dy = cellY + (cellH - ds.h) / 2;
             }
             const dx = cellX + (cellW - ds.w) / 2;
@@ -286,17 +369,16 @@ h3 { margin: 0 0 14px 0; font-size: 18px; }
           }
         }
 
-        // 基準サイズ注記（反転して右下に）
+        // 基準サイズ注記（右下・反転）
         const noteFontSize = Math.max(10, Math.round(cmToPx(0.28)));
         const noteText     = `基準 ${baseCm.toFixed(1)}cm`;
-        const noteX = PAGE_W - margin / 2;
-        const noteY = PAGE_H - margin / 3;
+        const noteX = PAGE_W - rulerSize / 2;
+        const noteY = PAGE_H - rulerSize / 3;
 
         ctx.save();
         ctx.font         = `${noteFontSize}px sans-serif`;
         ctx.textBaseline = 'bottom';
         ctx.fillStyle    = '#888';
-        // 左右反転固定なので常に反転
         ctx.translate(noteX, noteY);
         ctx.scale(-1, 1);
         ctx.textAlign = 'left';
