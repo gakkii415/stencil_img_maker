@@ -4,84 +4,155 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Stencil A4 Maker (Local)</title>
+  <title>Stencil A4 Maker</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, system-ui, sans-serif; padding: 16px; max-width: 800px; margin: 0 auto; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
-    label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
-    label.inline { flex-direction: row; align-items: center; gap: 6px; }
-    input[type="number"] { width: 100px; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
-    input[type="file"] { max-width: 100%; font-size: 14px; }
-    input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
-    #outImg { width: 100%; height: auto; border: 1px solid #ddd; margin-top: 16px; display: none; }
-    .hint { color: #555; font-size: 13px; line-height: 1.6; margin-top: 10px; background: #f8f8f8; padding: 10px 14px; border-radius: 8px; }
-    .status { font-size: 12px; color: #444; margin-top: 8px; min-height: 18px; }
-    .error { color: #c00; }
-    button { padding: 10px 20px; font-size: 15px; background: #0071e3; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
-    button:disabled { background: #aaa; cursor: not-allowed; }
-    button:not(:disabled):hover { background: #005bb5; }
-    #dlBtn { display: none; margin-top: 10px; padding: 10px 20px; font-size: 15px; background: #34c759; color: #fff; border: none; border-radius: 8px; cursor: pointer; text-decoration: none; }
-    #dlBtn:hover { background: #28a745; }
+    body { font-family: -apple-system, system-ui, sans-serif; padding: 16px; max-width: 800px; margin: 0 auto; background: #f5f5f5; }
+
+```
+h3 { margin: 0 0 14px 0; font-size: 18px; }
+
+/* ドロップゾーン */
+#dropZone {
+  border: 3px dashed #aaa;
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+  padding: 36px 20px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 16px;
+}
+#dropZone.over { border-color: #0071e3; background: #e8f0ff; }
+#dropZone.has-file { border-color: #34c759; background: #f0fff4; }
+#dropZone .icon { font-size: 48px; line-height: 1; margin-bottom: 8px; }
+#dropZone .main-text { font-size: 17px; font-weight: bold; color: #333; }
+#dropZone .sub-text  { font-size: 13px; color: #888; margin-top: 4px; }
+#fileInput { display: none; }
+
+/* 基準サイズ */
+.controls {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border-radius: 12px; padding: 14px 16px;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.controls label { font-size: 15px; font-weight: bold; white-space: nowrap; }
+.controls input[type="number"] {
+  width: 90px; padding: 10px; font-size: 20px; font-weight: bold;
+  border: 2px solid #ccc; border-radius: 8px; text-align: center;
+}
+.controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
+.controls .unit { font-size: 16px; color: #555; }
+.controls .hint-small { font-size: 12px; color: #999; }
+
+.status { font-size: 13px; color: #555; margin-bottom: 8px; min-height: 18px; }
+.error   { color: #c00; }
+
+#dlBtn {
+  display: none; margin-bottom: 12px;
+  padding: 12px 24px; font-size: 15px;
+  background: #34c759; color: #fff;
+  border: none; border-radius: 10px; cursor: pointer; text-decoration: none;
+}
+#outImg { width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; display: none; }
+```
+
   </style>
 </head>
 <body>
-  <h3 style="margin:0 0 12px 0;">Stencil A4 Maker（ローカル）</h3>
+  <h3>Stencil A4 Maker</h3>
 
-  <div class="row">
-    <label>
-      画像を選択
-      <input id="file" type="file" accept="image/*" />
-    </label>
-    <label>
-      基準サイズ（cm）
-      <input id="baseCm" type="number" inputmode="decimal" min="0.1" max="25" step="0.1" value="7" />
-    </label>
-    <label>
-      出力 DPI
-      <input id="dpi" type="number" min="72" max="600" step="1" value="300" />
-    </label>
-    <label class="inline">
-      <input id="mirror" type="checkbox" checked />
-      左右反転
-    </label>
-    <button id="make">生成</button>
+  <!-- ドロップゾーン -->
+
+  <div id="dropZone">
+    <div class="icon">🖼️</div>
+    <div class="main-text">画像をタップして選択</div>
+    <div class="sub-text">またはここにドラッグ＆ドロップ</div>
+  </div>
+  <input id="fileInput" type="file" accept="image/*" />
+
+  <!-- 基準サイズ -->
+
+  <div class="controls">
+    <label for="baseCm">基準サイズ（長辺）</label>
+    <input id="baseCm" type="number" inputmode="decimal" min="0.1" max="25" step="0.1" value="7" />
+    <span class="unit">cm</span>
+    <span class="hint-small">変更すると自動で再生成します</span>
   </div>
 
-  <div class="hint">
-    ・基準サイズを中心に最大5種類を自動配置します<br/>
-    ・4種類以上 → <b>0.5cm刻み</b>、3種類以下 → <b>1cm刻み</b><br/>
-    ・上下2枚が干渉する場合は1枚のみに自動調整します<br/>
-    ・横長の画像は自動で90度回転します<br/>
-    ・A4右下に基準サイズを記載します（反転あり時は文字も反転）
-  </div>
-
-  <p class="status" id="status"></p>
+  <p class="status" id="status">画像を選択すると自動で生成します</p>
   <a id="dlBtn" download="stencil_a4.png">💾 PNG を保存</a>
   <img id="outImg" alt="output" />
 
   <script>
     'use strict';
 
+    const DPI = 300; // 固定
+    const MIRROR = true; // 左右反転固定
+
     const $id = (id) => document.getElementById(id);
 
-    function cmToPx(cm, dpi) { return (cm / 2.54) * dpi; }
+    // --- ドロップゾーン ---
+    const dropZone  = $id('dropZone');
+    const fileInput = $id('fileInput');
 
-    function a4Px(dpi) {
-      return {
-        w: Math.round(cmToPx(21.0, dpi)),
-        h: Math.round(cmToPx(29.7, dpi)),
-      };
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('over');
+      const f = e.dataTransfer.files[0];
+      if (f && f.type.startsWith('image/')) handleFile(f);
+    });
+
+    fileInput.addEventListener('change', () => {
+      const f = fileInput.files[0];
+      if (f) handleFile(f);
+    });
+
+    // 基準サイズ変更で再生成
+    $id('baseCm').addEventListener('input', () => {
+      if (currentDataURL) scheduleGenerate();
+    });
+
+    // ---
+
+    let currentDataURL = null;
+    let generateTimer  = null;
+
+    function handleFile(file) {
+      dropZone.classList.add('has-file');
+      dropZone.querySelector('.main-text').textContent = file.name;
+      dropZone.querySelector('.sub-text').textContent  = '別の画像を選ぶにはタップ';
+      showStatus('読み込み中…');
+
+      const reader = new FileReader();
+      reader.onload  = (e) => { currentDataURL = e.target.result; scheduleGenerate(); };
+      reader.onerror = ()  => showStatus('ファイルの読み込みに失敗しました', true);
+      reader.readAsDataURL(file);
     }
 
-    function readFileAsDataURL(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = (e) => resolve(e.target.result);
-        reader.onerror = ()  => reject(new Error('ファイルの読み込みに失敗しました'));
-        reader.readAsDataURL(file);
-      });
+    // 短時間に連続入力されても1回だけ生成
+    function scheduleGenerate() {
+      clearTimeout(generateTimer);
+      generateTimer = setTimeout(generate, 300);
     }
+
+    function showStatus(msg, isError = false) {
+      const el = $id('status');
+      el.textContent = msg;
+      el.className = 'status' + (isError ? ' error' : '');
+    }
+
+    function cmToPx(cm) { return (cm / 2.54) * DPI; }
+
+    const PAGE_W = Math.round(cmToPx(21.0));
+    const PAGE_H = Math.round(cmToPx(29.7));
 
     function loadImage(dataURL) {
       return new Promise((resolve, reject) => {
@@ -92,21 +163,11 @@
       });
     }
 
-    function showStatus(msg, isError = false) {
-      const el = $id('status');
-      el.textContent = msg;
-      el.className = 'status' + (isError ? ' error' : '');
-    }
-
-    /**
-     * 画像描画（90度回転 / 左右反転 対応）
-     * x,y,w,h は「回転後」の描画先矩形
-     */
-    function drawImageTransformed(ctx, img, x, y, w, h, mirror, rotate) {
+    function drawImageTransformed(ctx, img, x, y, w, h, rotate) {
       ctx.save();
       ctx.translate(x + w / 2, y + h / 2);
       if (rotate) ctx.rotate(Math.PI / 2);
-      if (mirror) ctx.scale(-1, 1);
+      ctx.scale(-1, 1); // 左右反転固定
       const dw = rotate ? h : w;
       const dh = rotate ? w : h;
       ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
@@ -114,73 +175,55 @@
     }
 
     async function generate() {
-      const fileInput = $id('file');
-      const file = fileInput.files && fileInput.files[0];
-      if (!file) { showStatus('画像を選択してください', true); return; }
+      if (!currentDataURL) return;
 
       const baseCm = parseFloat($id('baseCm').value);
       if (!Number.isFinite(baseCm) || baseCm <= 0) {
-        showStatus('基準サイズに正の数値を入力してください', true); return;
+        showStatus('基準サイズに正の数値を入力してください', true);
+        return;
       }
 
-      const dpi = parseInt($id('dpi').value, 10);
-      if (!Number.isInteger(dpi) || dpi < 72 || dpi > 600) {
-        showStatus('DPI は 72〜600 の整数で入力してください', true); return;
-      }
-
-      const mirror  = $id('mirror').checked;
-      const makeBtn = $id('make');
-      makeBtn.disabled = true;
-      showStatus('読み込み中…');
+      showStatus('生成中…');
 
       try {
-        const dataURL = await readFileAsDataURL(file);
-        showStatus('生成中…');
-
-        const img = await loadImage(dataURL);
-        const iw = img.naturalWidth;
-        const ih = img.naturalHeight;
+        const img = await loadImage(currentDataURL);
+        const iw  = img.naturalWidth;
+        const ih  = img.naturalHeight;
         if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
 
-        // 横長なら90度回転して縦長として扱う
         const rotate   = iw > ih;
         const effW     = rotate ? ih : iw;
         const effH     = rotate ? iw : ih;
-        const longEdge = effH; // 縦長なので高さが長辺
+        const longEdge = effH;
 
-        const { w: pageW, h: pageH } = a4Px(dpi);
         const canvas  = document.createElement('canvas');
-        canvas.width  = pageW;
-        canvas.height = pageH;
+        canvas.width  = PAGE_W;
+        canvas.height = PAGE_H;
         const ctx = canvas.getContext('2d', { alpha: false });
 
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, pageW, pageH);
+        ctx.fillRect(0, 0, PAGE_W, PAGE_H);
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        // --- レイアウト定数 ---
-        const margin = Math.round(cmToPx(1.0, dpi)); // 余白 10mm
-        const gap    = Math.round(cmToPx(0.5, dpi)); // gap 5mm固定
+        const margin = Math.round(cmToPx(1.0));
+        const gap    = Math.round(cmToPx(0.5));
 
-        const contentW = pageW - margin * 2;
-        const contentH = pageH - margin * 2;
+        const contentW = PAGE_W - margin * 2;
+        const contentH = PAGE_H - margin * 2;
 
-        // cm → 描画サイズ(px)
         function drawSize(cm) {
-          const scale = cmToPx(cm, dpi) / longEdge;
+          const scale = cmToPx(cm) / longEdge;
           return { w: effW * scale, h: effH * scale };
         }
 
-        // nCols列レイアウトで sizes が収まるか（横方向のみ判定）
-        // 縦方向は後で各列ごとに判定するので、ここでは1枚分の高さで判定
         function tryLayout(nCols, sizes) {
           const cellW = Math.floor((contentW - gap * (nCols - 1)) / nCols);
-          const cellH = Math.floor((contentH - gap) / 2); // 2枚想定のセル高さ
           for (const cm of sizes) {
             const ds = drawSize(cm);
-            if (ds.w > cellW + 0.5 || ds.h > contentH + 0.5) return null; // 1枚でも縦に入らなければアウト
+            if (ds.w > cellW + 0.5 || ds.h > contentH + 0.5) return null;
           }
+          const cellH = Math.floor((contentH - gap) / 2);
           return { cellW, cellH };
         }
 
@@ -193,51 +236,32 @@
         }
 
         const trySets = [
-          [5, 0.5],
-          [4, 0.5],
-          [5, 1.0],
-          [4, 1.0],
-          [3, 1.0],
-          [2, 1.0],
-          [1, 1.0],
+          [5, 0.5], [4, 0.5],
+          [5, 1.0], [4, 1.0], [3, 1.0], [2, 1.0], [1, 1.0],
         ];
 
-        let bestLayout = null;
-        let bestCms    = null;
-        let bestStep   = 1.0;
-        let bestCount  = 1;
+        let bestLayout = null, bestCms = null, bestStep = 1.0, bestCount = 1;
 
         for (const [count, step] of trySets) {
           const cms    = makeCandidates(step, count);
           const layout = tryLayout(count, cms);
           if (layout) {
-            bestLayout = layout;
-            bestCms    = cms;
-            bestStep   = step;
-            bestCount  = count;
+            bestLayout = layout; bestCms = cms; bestStep = step; bestCount = count;
             break;
           }
         }
 
-        // 万一何も収まらなければ強制
         if (!bestLayout) {
-          bestLayout = {
-            cellW: contentW,
-            cellH: Math.floor((contentH - gap) / 2),
-          };
-          bestCms   = [baseCm];
-          bestCount = 1;
-          bestStep  = 1.0;
+          bestLayout = { cellW: contentW, cellH: Math.floor((contentH - gap) / 2) };
+          bestCms = [baseCm]; bestCount = 1; bestStep = 1.0;
         }
 
         const { cellW, cellH } = bestLayout;
         const nCols = bestCount;
 
-        // 列全体を水平中央揃え
         const totalUsedW = nCols * cellW + (nCols - 1) * gap;
         const offsetX    = margin + Math.floor((contentW - totalUsedW) / 2);
 
-        // --- 各列を描画 ---
         let someSingle = false;
 
         for (let col = 0; col < nCols; col++) {
@@ -245,8 +269,6 @@
           const ds    = drawSize(cm);
           const cellX = offsetX + col * (cellW + gap);
 
-          // 上下2枚置いたとき干渉しないか判定
-          // 画像高さ×2 + gap が contentH に収まればOK
           const fitsDouble = (ds.h * 2 + gap) <= contentH + 0.5;
           const nRows = fitsDouble ? 2 : 1;
           if (nRows === 1) someSingle = true;
@@ -254,66 +276,50 @@
           for (let row = 0; row < nRows; row++) {
             let dy;
             if (nRows === 1) {
-              // 縦中央に1枚
               dy = margin + (contentH - ds.h) / 2;
             } else {
               const cellY = margin + row * (cellH + gap);
               dy = cellY + (cellH - ds.h) / 2;
             }
             const dx = cellX + (cellW - ds.w) / 2;
-            drawImageTransformed(ctx, img, dx, dy, ds.w, ds.h, mirror, rotate);
+            drawImageTransformed(ctx, img, dx, dy, ds.w, ds.h, rotate);
           }
         }
 
-        // --- 基準サイズ注記（右下余白・mirror時は文字も反転）---
-        const noteFontSize = Math.max(10, Math.round(cmToPx(0.28, dpi)));
+        // 基準サイズ注記（反転して右下に）
+        const noteFontSize = Math.max(10, Math.round(cmToPx(0.28)));
         const noteText     = `基準 ${baseCm.toFixed(1)}cm`;
-        // 描画基準点（右下）
-        const noteX = pageW - margin / 2;
-        const noteY = pageH - margin / 3;
+        const noteX = PAGE_W - margin / 2;
+        const noteY = PAGE_H - margin / 3;
 
         ctx.save();
         ctx.font         = `${noteFontSize}px sans-serif`;
         ctx.textBaseline = 'bottom';
         ctx.fillStyle    = '#888';
-
-        if (mirror) {
-          // 基準点へ移動してX軸反転 → textAlign:left で右下に収まる
-          ctx.translate(noteX, noteY);
-          ctx.scale(-1, 1);
-          ctx.textAlign = 'left';
-          ctx.fillText(noteText, 0, 0);
-        } else {
-          ctx.textAlign = 'right';
-          ctx.fillText(noteText, noteX, noteY);
-        }
+        // 左右反転固定なので常に反転
+        ctx.translate(noteX, noteY);
+        ctx.scale(-1, 1);
+        ctx.textAlign = 'left';
+        ctx.fillText(noteText, 0, 0);
         ctx.restore();
 
-        // --- 出力 ---
         const dataUrl = canvas.toDataURL('image/png');
         $id('outImg').src = dataUrl;
         $id('outImg').style.display = 'block';
         $id('dlBtn').href = dataUrl;
         $id('dlBtn').style.display = 'inline-block';
 
-        const stepLabel   = bestStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
-        const rotateNote  = rotate     ? ' ／ 90°回転' : '';
-        const singleNote  = someSingle ? ' ／ 一部1枚のみ' : '';
-        showStatus(
-          `完了 — ${nCols}種類 ${stepLabel}${rotateNote}${singleNote}　` +
-          bestCms.map(c => c.toFixed(1) + 'cm').join(' / ') +
-          `　${pageW}×${pageH}px（${dpi}dpi）`
-        );
+        const stepLabel  = bestStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
+        const rotNote    = rotate     ? ' ／ 90°回転' : '';
+        const singleNote = someSingle ? ' ／ 一部1枚' : '';
+        showStatus(`完了 — ${nCols}種類 ${stepLabel}${rotNote}${singleNote}　` +
+          bestCms.map(c => c.toFixed(1) + 'cm').join(' / '));
 
       } catch (err) {
         console.error(err);
         showStatus('エラー：' + (err.message || '生成に失敗しました'), true);
-      } finally {
-        makeBtn.disabled = false;
       }
     }
-
-    $id('make').addEventListener('click', generate);
   </script>
 
 </body>
