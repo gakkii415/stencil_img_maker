@@ -20,51 +20,52 @@
     #dropZone .main-text { font-size: 17px; font-weight: bold; color: #333; }
     #dropZone .sub-text  { font-size: 13px; color: #888; margin-top: 4px; }
     #fileInput { display: none; }
-
-```
-.controls {
-  display: flex; align-items: center; gap: 12px;
-  background: #fff; border-radius: 12px; padding: 14px 16px;
-  margin-bottom: 12px; flex-wrap: wrap;
-}
-.controls label { font-size: 15px; font-weight: bold; white-space: nowrap; }
-.controls input[type="number"] {
-  width: 90px; padding: 10px; font-size: 20px; font-weight: bold;
-  border: 2px solid #ccc; border-radius: 8px; text-align: center;
-}
-.controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
-.controls .unit       { font-size: 16px; color: #555; }
-.controls .hint-small { font-size: 12px; color: #999; }
-
-/* 向きトグルボタン */
-#orientBtn {
-  display: flex; align-items: center; gap: 8px;
-  background: #fff; border-radius: 12px; padding: 12px 16px;
-  margin-bottom: 12px; border: 2px solid #ddd; cursor: pointer;
-  font-size: 15px; font-weight: bold; color: #333;
-  transition: border-color 0.2s, background 0.2s;
-  width: 100%;
-}
-#orientBtn:hover { border-color: #0071e3; }
-#orientBtn .icon-wrap {
-  font-size: 28px; line-height: 1;
-  transition: transform 0.3s ease;
-}
-#orientBtn.landscape .icon-wrap { transform: rotate(90deg); }
-#orientBtn .label-main { font-size: 15px; font-weight: bold; }
-#orientBtn .label-sub  { font-size: 12px; color: #888; margin-left: 4px; }
-
-.status { font-size: 13px; color: #555; margin-bottom: 8px; min-height: 18px; }
-.error  { color: #c00; }
-#dlBtn {
-  display: none; margin-bottom: 12px;
-  padding: 12px 24px; font-size: 15px;
-  background: #34c759; color: #fff;
-  border: none; border-radius: 10px; cursor: pointer; text-decoration: none;
-}
-#outImg { width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; display: none; }
-```
-
+    .controls {
+      display: flex; align-items: center; gap: 12px;
+      background: #fff; border-radius: 12px; padding: 14px 16px;
+      margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .controls label { font-size: 15px; font-weight: bold; white-space: nowrap; }
+    .controls input[type="number"] {
+      width: 90px; padding: 10px; font-size: 20px; font-weight: bold;
+      border: 2px solid #ccc; border-radius: 8px; text-align: center;
+    }
+    .controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
+    .controls .unit       { font-size: 16px; color: #555; }
+    .controls .hint-small { font-size: 12px; color: #999; }
+    #orientBtn {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff; border-radius: 12px; padding: 12px 16px;
+      margin-bottom: 12px; border: 2px solid #ddd; cursor: pointer;
+      font-size: 15px; font-weight: bold; color: #333;
+      transition: border-color 0.2s, background 0.2s; width: 100%;
+    }
+    #orientBtn:hover { border-color: #0071e3; }
+    #orientBtn .icon-wrap { font-size: 28px; line-height: 1; transition: transform 0.3s ease; }
+    #orientBtn.landscape .icon-wrap { transform: rotate(90deg); }
+    #orientBtn .label-main { font-size: 15px; font-weight: bold; }
+    #orientBtn .label-sub  { font-size: 12px; color: #888; margin-left: 4px; }
+    .status { font-size: 13px; color: #555; margin-bottom: 12px; min-height: 18px; }
+    .error  { color: #c00; }
+    .output-section { display: none; flex-direction: column; gap: 20px; margin-top: 8px; }
+    .output-card { background: #fff; border-radius: 12px; padding: 14px; border: 1px solid #ddd; }
+    .output-card .card-title {
+      font-size: 14px; font-weight: bold; color: #555;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+    }
+    .output-card .card-title .badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 99px; color: #fff;
+    }
+    .badge-main  { background: #0071e3; }
+    .badge-small { background: #888; }
+    .badge-large { background: #e35a00; }
+    .output-card img { width: 100%; height: auto; border-radius: 6px; border: 1px solid #eee; }
+    .output-card a {
+      display: inline-block; margin-top: 10px;
+      padding: 10px 20px; font-size: 14px;
+      background: #34c759; color: #fff;
+      border: none; border-radius: 8px; cursor: pointer; text-decoration: none;
+    }
   </style>
 </head>
 <body>
@@ -84,8 +85,6 @@
     <span class="hint-small">変更すると自動で再生成します</span>
   </div>
 
-  <!-- 向き切り替えボタン -->
-
   <button id="orientBtn">
     <span class="icon-wrap">📱</span>
     <span class="label-main" id="orientLabel">長辺：縦</span>
@@ -93,8 +92,24 @@
   </button>
 
   <p class="status" id="status">画像を選択すると自動で生成します</p>
-  <a id="dlBtn" download="stencil_a4.png">💾 PNG を保存</a>
-  <img id="outImg" alt="output" />
+
+  <div class="output-section" id="outputSection">
+    <div class="output-card" id="card-main">
+      <div class="card-title"><span class="badge badge-main">メイン</span><span id="label-main"></span></div>
+      <img id="img-main" alt="main" />
+      <a id="dl-main" download="stencil_main.png">💾 保存</a>
+    </div>
+    <div class="output-card" id="card-small">
+      <div class="card-title"><span class="badge badge-small">小さいバージョン</span><span id="label-small"></span></div>
+      <img id="img-small" alt="small" />
+      <a id="dl-small" download="stencil_small.png">💾 保存</a>
+    </div>
+    <div class="output-card" id="card-large">
+      <div class="card-title"><span class="badge badge-large">大きいバージョン</span><span id="label-large"></span></div>
+      <img id="img-large" alt="large" />
+      <a id="dl-large" download="stencil_large.png">💾 保存</a>
+    </div>
+  </div>
 
   <script>
     'use strict';
@@ -102,22 +117,14 @@
     const DPI = 300;
     const $id = (id) => document.getElementById(id);
 
-    // --- 向き状態 ---
-    // forceRotate: null=自動（横長画像だけ回転）, 'portrait'=強制縦, 'landscape'=強制横
-    // ボタンで切り替えるのは「長辺を縦 or 横」
-    // true = 長辺を縦にする（= 横長画像を90度回転して縦にする、縦長はそのまま）
-    // false = 長辺を横にする（= 縦長画像を90度回転して横にする、横長はそのまま）
-    let longSideVertical = true; // デフォルト：長辺縦
-
+    let longSideVertical = true;
     const orientBtn   = $id('orientBtn');
     const orientLabel = $id('orientLabel');
-
     orientBtn.addEventListener('click', () => {
       longSideVertical = !longSideVertical;
       updateOrientBtn();
       if (currentDataURL) scheduleGenerate();
     });
-
     function updateOrientBtn() {
       if (longSideVertical) {
         orientBtn.classList.remove('landscape');
@@ -130,10 +137,8 @@
       }
     }
 
-    // --- ドロップゾーン ---
     const dropZone  = $id('dropZone');
     const fileInput = $id('fileInput');
-
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('over'); });
     dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('over'));
@@ -171,9 +176,10 @@
     }
 
     function cmToPx(cm) { return (cm / 2.54) * DPI; }
+    function mmToPx(mm) { return (mm / 25.4) * DPI; }
 
-    const PAGE_W = Math.round(cmToPx(21.0));
-    const PAGE_H = Math.round(cmToPx(29.7));
+    const PAGE_W = Math.round(mmToPx(192.75));
+    const PAGE_H = Math.round(mmToPx(276.87));
 
     function loadImage(dataURL) {
       return new Promise((resolve, reject) => {
@@ -184,12 +190,11 @@
       });
     }
 
-    // rotate: true = 90度回転して描画
     function drawImageTransformed(ctx, img, x, y, w, h, rotate) {
       ctx.save();
       ctx.translate(x + w / 2, y + h / 2);
       if (rotate) ctx.rotate(Math.PI / 2);
-      ctx.scale(-1, 1); // 左右反転固定
+      ctx.scale(-1, 1);
       const dw = rotate ? h : w;
       const dh = rotate ? w : h;
       ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
@@ -202,63 +207,134 @@
       const tickLong  = rulerSize * 0.55;
       const tickShort = rulerSize * 0.30;
       const fontSize  = Math.max(10, Math.round(rulerSize * 0.38));
-
       ctx.save();
       ctx.lineWidth = Math.max(1, Math.round(cmToPx(0.02)));
       ctx.font      = `${fontSize}px sans-serif`;
 
-      // 上部ルーラー
       ctx.fillStyle = '#f0f0f0';
       ctx.fillRect(originX, 0, contentW, rulerSize);
       ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
       ctx.beginPath(); ctx.moveTo(originX, rulerSize); ctx.lineTo(originX + contentW, rulerSize); ctx.stroke();
-
       for (let i = 0; i * oneCm <= contentW + 1; i++) {
         const x = originX + i * oneCm;
         if (x > originX + contentW + 1) break;
         ctx.beginPath(); ctx.moveTo(x, rulerSize); ctx.lineTo(x, rulerSize - tickLong); ctx.stroke();
         if (i > 0) {
-          ctx.save();
-          ctx.translate(x, rulerSize - tickLong - fontSize * 0.1);
-          ctx.scale(-1, 1);
-          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-          ctx.fillText(String(i), 0, 0);
-          ctx.restore();
+          ctx.save(); ctx.translate(x, rulerSize - tickLong - fontSize * 0.1); ctx.scale(-1, 1);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(i), 0, 0); ctx.restore();
         }
         const x5 = x + halfCm;
-        if (x5 <= originX + contentW) {
-          ctx.beginPath(); ctx.moveTo(x5, rulerSize); ctx.lineTo(x5, rulerSize - tickShort); ctx.stroke();
-        }
+        if (x5 <= originX + contentW) { ctx.beginPath(); ctx.moveTo(x5, rulerSize); ctx.lineTo(x5, rulerSize - tickShort); ctx.stroke(); }
       }
 
-      // 左側ルーラー
       ctx.fillStyle = '#f0f0f0';
       ctx.fillRect(0, originY, rulerSize, contentH);
       ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
       ctx.beginPath(); ctx.moveTo(rulerSize, originY); ctx.lineTo(rulerSize, originY + contentH); ctx.stroke();
-
       for (let i = 0; i * oneCm <= contentH + 1; i++) {
         const y = originY + i * oneCm;
         if (y > originY + contentH + 1) break;
         ctx.beginPath(); ctx.moveTo(rulerSize, y); ctx.lineTo(rulerSize - tickLong, y); ctx.stroke();
         if (i > 0) {
-          ctx.save();
-          ctx.translate(rulerSize - tickLong - fontSize * 0.15, y);
-          ctx.rotate(-Math.PI / 2);
-          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-          ctx.fillText(String(i), 0, 0);
-          ctx.restore();
+          ctx.save(); ctx.translate(rulerSize - tickLong - fontSize * 0.15, y); ctx.rotate(-Math.PI / 2);
+          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(i), 0, 0); ctx.restore();
         }
         const y5 = y + halfCm;
-        if (y5 <= originY + contentH) {
-          ctx.beginPath(); ctx.moveTo(rulerSize, y5); ctx.lineTo(rulerSize - tickShort, y5); ctx.stroke();
-        }
+        if (y5 <= originY + contentH) { ctx.beginPath(); ctx.moveTo(rulerSize, y5); ctx.lineTo(rulerSize - tickShort, y5); ctx.stroke(); }
       }
-
-      // 左上コーナー
       ctx.fillStyle = '#e0e0e0';
       ctx.fillRect(0, 0, rulerSize, rulerSize);
       ctx.restore();
+    }
+
+    /**
+     * cmList に対して「実際の画像サイズ」で収まるか判定。
+     * 各行の高さ = その行の画像の実高さ（均等割りしない）
+     * 総使用高さ = Σ(各行の画像高さ) + gap*(n-1) ≤ contentH
+     * 横幅: 2枚横並びの場合は画像幅*2+gap ≤ contentW、1枚の場合は画像幅 ≤ contentW
+     */
+    function fitsLayoutExact(cmList, drawSizeFn, contentW, contentH, gap) {
+      let totalH = 0;
+      for (let i = 0; i < cmList.length; i++) {
+        const ds = drawSizeFn(cmList[i]);
+        // 横幅チェック（1枚でもcontentWに収まること）
+        if (ds.w > contentW + 0.5) return false;
+        totalH += ds.h;
+        if (i > 0) totalH += gap;
+        if (totalH > contentH + 0.5) return false;
+      }
+      return true;
+    }
+
+    /**
+     * cmList を使って1枚のキャンバスを生成。
+     * 各行の高さは画像の実サイズ、余った縦スペースは均等に分配して中央揃え。
+     */
+    function buildCanvas(img, effW, effH, longEdge, rotate, cmList, baseCm) {
+      const canvas  = document.createElement('canvas');
+      canvas.width  = PAGE_W;
+      canvas.height = PAGE_H;
+      const ctx = canvas.getContext('2d', { alpha: false });
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      const rulerSize = Math.round(cmToPx(1.0));
+      const gap       = Math.round(cmToPx(0.5));
+      const originX   = rulerSize;
+      const originY   = rulerSize;
+      const contentW  = PAGE_W - rulerSize * 2;
+      const contentH  = PAGE_H - rulerSize * 2;
+
+      drawRulers(ctx, originX, originY, contentW, contentH, rulerSize);
+
+      function drawSize(cm) {
+        const scale = cmToPx(cm) / longEdge;
+        return { w: effW * scale, h: effH * scale };
+      }
+
+      const n = cmList.length;
+      // 各行の画像サイズを計算
+      const sizes = cmList.map(cm => drawSize(cm));
+      // 総使用高さ（画像分 + gap）
+      const totalImgH = sizes.reduce((s, ds) => s + ds.h, 0) + gap * (n - 1);
+      // 余白を上下に均等配分して中央揃え
+      const offsetY = originY + Math.max(0, Math.floor((contentH - totalImgH) / 2));
+
+      let curY = offsetY;
+      for (let row = 0; row < n; row++) {
+        const ds = sizes[row];
+        const rowY = curY;
+
+        // 2枚横並びが可能か
+        const fitsDouble = (ds.w * 2 + gap) <= contentW + 0.5;
+        const nCols = fitsDouble ? 2 : 1;
+
+        const totalImgW = nCols === 2 ? ds.w * 2 + gap : ds.w;
+        const startX    = originX + Math.floor((contentW - totalImgW) / 2);
+
+        for (let col = 0; col < nCols; col++) {
+          const dx = startX + col * (ds.w + gap);
+          const dy = rowY; // 上揃え（行内の余白なし）
+          drawImageTransformed(ctx, img, dx, dy, ds.w, ds.h, rotate);
+        }
+
+        curY += ds.h + gap;
+      }
+
+      // 基準サイズ注記（右下・反転）
+      const noteFontSize = Math.max(10, Math.round(cmToPx(0.28)));
+      ctx.save();
+      ctx.font = `${noteFontSize}px sans-serif`;
+      ctx.textBaseline = 'bottom'; ctx.fillStyle = '#888';
+      ctx.translate(PAGE_W - rulerSize / 2, PAGE_H - rulerSize / 3);
+      ctx.scale(-1, 1); ctx.textAlign = 'left';
+      ctx.fillText(`基準 ${baseCm.toFixed(1)}cm`, 0, 0);
+      ctx.restore();
+
+      return canvas;
     }
 
     async function generate() {
@@ -278,144 +354,111 @@
         const ih  = img.naturalHeight;
         if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
 
-        // --- 向き計算 ---
-        // longSideVertical=true  → 長辺が縦になるよう配置
-        //   縦長(ih>=iw): そのまま(rotate=false)
-        //   横長(iw>ih) : 90度回転(rotate=true)
-        // longSideVertical=false → 長辺が横になるよう配置
-        //   横長(iw>ih) : そのまま(rotate=false)
-        //   縦長(ih>=iw): 90度回転(rotate=true)
-        const isPortrait = ih >= iw; // 元画像が縦長か
-        let rotate;
-        if (longSideVertical) {
-          rotate = !isPortrait; // 横長なら回転して縦に
-        } else {
-          rotate = isPortrait;  // 縦長なら回転して横に
-        }
-
-        // 回転後の実効サイズ
-        const effW = rotate ? ih : iw;
-        const effH = rotate ? iw : ih;
-        // 長辺（基準にする辺）
+        const isPortrait = ih >= iw;
+        const rotate   = longSideVertical ? !isPortrait : isPortrait;
+        const effW     = rotate ? ih : iw;
+        const effH     = rotate ? iw : ih;
         const longEdge = Math.max(effW, effH);
-
-        const canvas  = document.createElement('canvas');
-        canvas.width  = PAGE_W;
-        canvas.height = PAGE_H;
-        const ctx = canvas.getContext('2d', { alpha: false });
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, PAGE_W, PAGE_H);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
 
         const rulerSize = Math.round(cmToPx(1.0));
         const gap       = Math.round(cmToPx(0.5));
-        const originX   = rulerSize;
-        const originY   = rulerSize;
         const contentW  = PAGE_W - rulerSize * 2;
         const contentH  = PAGE_H - rulerSize * 2;
-
-        drawRulers(ctx, originX, originY, contentW, contentH, rulerSize);
 
         function drawSize(cm) {
           const scale = cmToPx(cm) / longEdge;
           return { w: effW * scale, h: effH * scale };
         }
 
-        // nRows行・各行2枚横並びのレイアウトで全サイズが収まるか判定
-        function tryLayout(nRows, sizes) {
-          const cellW = Math.floor((contentW - gap) / 2);
-          const cellH = Math.floor((contentH - gap * (nRows - 1)) / nRows);
-          if (cellH <= 0) return null;
-          for (const cm of sizes) {
-            const ds = drawSize(cm);
-            if (ds.w > cellW + 0.5 || ds.h > cellH + 0.5) return null;
-          }
-          return { cellW, cellH };
+        // 実サイズベースの収まり判定
+        function fits(cmList) {
+          return fitsLayoutExact(cmList, drawSize, contentW, contentH, gap);
         }
 
-        function makeCandidates(step, count) {
+        // ---- メイン：baseCm中心に ±step で可能な限り拡張 ----
+        function makeCenteredList(step, count) {
           const half = Math.floor(count / 2);
-          return Array.from({ length: count }, (_, i) => {
-            const offset = (i - half) * step;
-            return Math.max(0.1, Math.round((baseCm + offset) * 100) / 100);
-          });
+          return Array.from({ length: count }, (_, i) =>
+            Math.max(0.1, Math.round((baseCm + (i - half) * step) * 100) / 100)
+          );
         }
 
+        // 4種以上なら0.5cm刻み、3種以下なら1cm刻みのルールはそのまま
         const trySets = [
           [5, 0.5], [4, 0.5],
           [5, 1.0], [4, 1.0], [3, 1.0], [2, 1.0], [1, 1.0],
         ];
 
-        let bestLayout = null, bestCms = null, bestStep = 1.0, bestCount = 1;
-
+        let mainCms = [baseCm], mainStep = 1.0;
         for (const [count, step] of trySets) {
-          const cms    = makeCandidates(step, count);
-          const layout = tryLayout(count, cms);
-          if (layout) {
-            bestLayout = layout; bestCms = cms; bestStep = step; bestCount = count;
-            break;
+          const cms = makeCenteredList(step, count);
+          if (fits(cms)) { mainCms = cms; mainStep = step; break; }
+        }
+
+        const mainMin = Math.min(...mainCms);
+        const mainMax = Math.max(...mainCms);
+
+        // ---- 大きいバージョン：mainMax+step から上へ、入る限り追加 ----
+        function buildLargeList() {
+          const list = [];
+          let cm = Math.round((mainMax + mainStep) * 100) / 100;
+          while (true) {
+            const candidate = [...list, cm];
+            if (!fits(candidate)) break;
+            list.push(cm);
+            cm = Math.round((cm + mainStep) * 100) / 100;
+          }
+          return list.length > 0 ? list : null;
+        }
+
+        // ---- 小さいバージョン：mainMin-step から下へ、入る限り追加 ----
+        // 上から大→小の順（大きいものが上）
+        function buildSmallList() {
+          const list = [];
+          let cm = Math.max(0.1, Math.round((mainMin - mainStep) * 100) / 100);
+          while (cm >= 0.1) {
+            const candidate = [...list, cm];
+            if (!fits(candidate)) break;
+            list.push(cm);
+            const next = Math.round((cm - mainStep) * 100) / 100;
+            if (next < 0.1) break;
+            cm = next;
+          }
+          return list.length > 0 ? list : null;
+        }
+
+        const largeCms = buildLargeList();
+        const smallCms = buildSmallList();
+
+        // ---- 描画 ----
+        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms,  baseCm);
+        const largeCanvas = largeCms ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms, baseCm) : null;
+        const smallCanvas = smallCms ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms, baseCm) : null;
+
+        // ---- UI反映：メイン→小→大の順 ----
+        function setCard(imgEl, dlEl, labelEl, canvas, sizes) {
+          const card = imgEl.closest('.output-card');
+          if (canvas) {
+            const url = canvas.toDataURL('image/png');
+            imgEl.src = url; dlEl.href = url;
+            card.style.display = 'block';
+            labelEl.textContent = sizes.map(c => c.toFixed(1) + 'cm').join(' / ');
+          } else {
+            card.style.display = 'none';
           }
         }
 
-        if (!bestLayout) {
-          bestLayout = { cellW: contentW, cellH: contentH };
-          bestCms = [baseCm]; bestCount = 1; bestStep = 1.0;
-        }
+        setCard($id('img-main'),  $id('dl-main'),  $id('label-main'),  mainCanvas,  mainCms);
+        setCard($id('img-small'), $id('dl-small'), $id('label-small'), smallCanvas, smallCms || []);
+        setCard($id('img-large'), $id('dl-large'), $id('label-large'), largeCanvas, largeCms || []);
 
-        const { cellW, cellH } = bestLayout;
-        const nRows = bestCount;
+        $id('outputSection').style.display = 'flex';
 
-        // 行グループ全体を垂直中央揃え
-        const totalUsedH = nRows * cellH + (nRows - 1) * gap;
-        const offsetY    = originY + Math.floor((contentH - totalUsedH) / 2);
-
-        let someSingle = false;
-
-        for (let row = 0; row < nRows; row++) {
-          const cm   = bestCms[row];
-          const ds   = drawSize(cm);
-          const rowY = offsetY + row * (cellH + gap);
-
-          // 横2枚が収まるか
-          const fitsDouble = (ds.w * 2 + gap) <= contentW + 0.5;
-          const nCols = fitsDouble ? 2 : 1;
-          if (nCols === 1) someSingle = true;
-
-          const totalImgW = nCols === 2 ? ds.w * 2 + gap : ds.w;
-          const startX    = originX + Math.floor((contentW - totalImgW) / 2);
-
-          for (let col = 0; col < nCols; col++) {
-            const dx = startX + col * (ds.w + gap);
-            const dy = rowY + (cellH - ds.h) / 2;
-            drawImageTransformed(ctx, img, dx, dy, ds.w, ds.h, rotate);
-          }
-        }
-
-        // 基準サイズ注記（右下・反転）
-        const noteFontSize = Math.max(10, Math.round(cmToPx(0.28)));
-        const noteText     = `基準 ${baseCm.toFixed(1)}cm`;
-        ctx.save();
-        ctx.font = `${noteFontSize}px sans-serif`;
-        ctx.textBaseline = 'bottom'; ctx.fillStyle = '#888';
-        ctx.translate(PAGE_W - rulerSize / 2, PAGE_H - rulerSize / 3);
-        ctx.scale(-1, 1); ctx.textAlign = 'left';
-        ctx.fillText(noteText, 0, 0);
-        ctx.restore();
-
-        const dataUrl = canvas.toDataURL('image/png');
-        $id('outImg').src = dataUrl;
-        $id('outImg').style.display = 'block';
-        $id('dlBtn').href = dataUrl;
-        $id('dlBtn').style.display = 'inline-block';
-
-        const stepLabel   = bestStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
-        const rotNote     = rotate     ? ' ／ 90°回転' : '';
-        const singleNote  = someSingle ? ' ／ 一部1枚' : '';
-        const orientNote  = longSideVertical ? '長辺縦' : '長辺横';
-        showStatus(`完了 — ${nRows}種類 ${stepLabel} ${orientNote}${rotNote}${singleNote}　` +
-          bestCms.map(c => c.toFixed(1) + 'cm').join(' / '));
+        const stepLabel  = mainStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
+        const orientNote = longSideVertical ? '長辺縦' : '長辺横';
+        showStatus(`完了 — ${stepLabel} ${orientNote}　メイン: ${mainCms.map(c=>c.toFixed(1)+'cm').join('/')}`
+          + (smallCms ? `　小: ${smallCms.map(c=>c.toFixed(1)+'cm').join('/')}` : '')
+          + (largeCms ? `　大: ${largeCms.map(c=>c.toFixed(1)+'cm').join('/')}` : ''));
 
       } catch (err) {
         console.error(err);
