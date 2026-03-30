@@ -51,20 +51,17 @@
     .output-card { background: #fff; border-radius: 12px; padding: 14px; border: 1px solid #ddd; }
     .output-card .card-title {
       font-size: 14px; font-weight: bold; color: #555;
-      margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     }
-    .output-card .card-title .badge {
-      font-size: 11px; padding: 2px 8px; border-radius: 99px; color: #fff;
-    }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; color: #fff; white-space: nowrap; }
     .badge-main  { background: #0071e3; }
     .badge-small { background: #888; }
     .badge-large { background: #e35a00; }
     .output-card img { width: 100%; height: auto; border-radius: 6px; border: 1px solid #eee; }
     .output-card a {
-      display: inline-block; margin-top: 10px;
-      padding: 10px 20px; font-size: 14px;
-      background: #34c759; color: #fff;
-      border: none; border-radius: 8px; cursor: pointer; text-decoration: none;
+      display: inline-block; margin-top: 10px; padding: 10px 20px; font-size: 14px;
+      background: #34c759; color: #fff; border: none; border-radius: 8px;
+      cursor: pointer; text-decoration: none;
     }
   </style>
 </head>
@@ -118,8 +115,7 @@
     const $id = (id) => document.getElementById(id);
 
     let longSideVertical = true;
-    const orientBtn   = $id('orientBtn');
-    const orientLabel = $id('orientLabel');
+    const orientBtn = $id('orientBtn');
     orientBtn.addEventListener('click', () => {
       longSideVertical = !longSideVertical;
       updateOrientBtn();
@@ -128,11 +124,11 @@
     function updateOrientBtn() {
       if (longSideVertical) {
         orientBtn.classList.remove('landscape');
-        orientLabel.textContent = '長辺：縦';
+        $id('orientLabel').textContent = '長辺：縦';
         orientBtn.querySelector('.label-sub').textContent = 'タップで横に切り替え';
       } else {
         orientBtn.classList.add('landscape');
-        orientLabel.textContent = '長辺：横';
+        $id('orientLabel').textContent = '長辺：横';
         orientBtn.querySelector('.label-sub').textContent = 'タップで縦に切り替え';
       }
     }
@@ -150,8 +146,7 @@
     fileInput.addEventListener('change', () => { const f = fileInput.files[0]; if (f) handleFile(f); });
     $id('baseCm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
 
-    let currentDataURL = null;
-    let generateTimer  = null;
+    let currentDataURL = null, generateTimer = null;
 
     function handleFile(file) {
       dropZone.classList.add('has-file');
@@ -202,14 +197,12 @@
     }
 
     function drawRulers(ctx, originX, originY, contentW, contentH, rulerSize) {
-      const oneCm     = cmToPx(1);
-      const halfCm    = cmToPx(0.5);
-      const tickLong  = rulerSize * 0.55;
-      const tickShort = rulerSize * 0.30;
-      const fontSize  = Math.max(10, Math.round(rulerSize * 0.38));
+      const oneCm = cmToPx(1), halfCm = cmToPx(0.5);
+      const tickLong = rulerSize * 0.55, tickShort = rulerSize * 0.30;
+      const fontSize = Math.max(10, Math.round(rulerSize * 0.38));
       ctx.save();
       ctx.lineWidth = Math.max(1, Math.round(cmToPx(0.02)));
-      ctx.font      = `${fontSize}px sans-serif`;
+      ctx.font = `${fontSize}px sans-serif`;
 
       ctx.fillStyle = '#f0f0f0';
       ctx.fillRect(originX, 0, contentW, rulerSize);
@@ -247,35 +240,12 @@
       ctx.restore();
     }
 
-    /**
-     * cmList に対して「実際の画像サイズ」で収まるか判定。
-     * 各行の高さ = その行の画像の実高さ（均等割りしない）
-     * 総使用高さ = Σ(各行の画像高さ) + gap*(n-1) ≤ contentH
-     * 横幅: 2枚横並びの場合は画像幅*2+gap ≤ contentW、1枚の場合は画像幅 ≤ contentW
-     */
-    function fitsLayoutExact(cmList, drawSizeFn, contentW, contentH, gap) {
-      let totalH = 0;
-      for (let i = 0; i < cmList.length; i++) {
-        const ds = drawSizeFn(cmList[i]);
-        // 横幅チェック（1枚でもcontentWに収まること）
-        if (ds.w > contentW + 0.5) return false;
-        totalH += ds.h;
-        if (i > 0) totalH += gap;
-        if (totalH > contentH + 0.5) return false;
-      }
-      return true;
-    }
-
-    /**
-     * cmList を使って1枚のキャンバスを生成。
-     * 各行の高さは画像の実サイズ、余った縦スペースは均等に分配して中央揃え。
-     */
+    // cmList を上から順に描画してキャンバスを返す
     function buildCanvas(img, effW, effH, longEdge, rotate, cmList, baseCm) {
-      const canvas  = document.createElement('canvas');
+      const canvas = document.createElement('canvas');
       canvas.width  = PAGE_W;
       canvas.height = PAGE_H;
       const ctx = canvas.getContext('2d', { alpha: false });
-
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, PAGE_W, PAGE_H);
       ctx.imageSmoothingEnabled = true;
@@ -290,38 +260,48 @@
 
       drawRulers(ctx, originX, originY, contentW, contentH, rulerSize);
 
-      function drawSize(cm) {
-        const scale = cmToPx(cm) / longEdge;
-        return { w: effW * scale, h: effH * scale };
+      function ds(cm) {
+        const s = cmToPx(cm) / longEdge;
+        return { w: effW * s, h: effH * s };
       }
 
-      const n = cmList.length;
-      // 各行の画像サイズを計算
-      const sizes = cmList.map(cm => drawSize(cm));
-      // 総使用高さ（画像分 + gap）
-      const totalImgH = sizes.reduce((s, ds) => s + ds.h, 0) + gap * (n - 1);
-      // 余白を上下に均等配分して中央揃え
-      const offsetY = originY + Math.max(0, Math.floor((contentH - totalImgH) / 2));
+      const sizes = cmList.map(cm => ds(cm));
+      let curY = originY;
 
-      let curY = offsetY;
-      for (let row = 0; row < n; row++) {
-        const ds = sizes[row];
-        const rowY = curY;
+      // 各行の列数を計算
+      const nColsPerRow = sizes.map(d =>
+        Math.min(4, Math.max(1, Math.floor((contentW + gap) / (d.w + gap))))
+      );
 
-        // 2枚横並びが可能か
-        const fitsDouble = (ds.w * 2 + gap) <= contentW + 0.5;
-        const nCols = fitsDouble ? 2 : 1;
+      // 全行の最大列数を基準グリッドとする
+      const maxCols = Math.max(...nColsPerRow);
 
-        const totalImgW = nCols === 2 ? ds.w * 2 + gap : ds.w;
-        const startX    = originX + Math.floor((contentW - totalImgW) / 2);
+      // 基準グリッドの列幅：最大列数の行が中央揃えになるよう決定
+      // 各列の中心X座標を maxCols 基準で計算する
+      // colCenters[i] = i番目の列（0始まり）の中心X（originXからの相対）
+      // maxCols列の場合の総幅を求め、その左端をオフセットとする
+      // ただし各行の画像サイズが違うので、列中心だけ共有し幅は各行独自
+      // → maxCols列の「列セル幅」= contentW / maxCols（gap込み）をグリッド単位とする
+      const gridUnitW = (contentW + gap) / maxCols; // 1列分の幅（gap含む）
+
+      for (let row = 0; row < cmList.length; row++) {
+        const d = sizes[row];
+        const nCols = nColsPerRow[row];
+
+        // この行の nCols 枚を、maxCols グリッドの中央に寄せて配置
+        // 中央寄せ：グリッド上で何列目から始めるか
+        const colStart = Math.floor((maxCols - nCols) / 2); // 開始グリッド列インデックス
 
         for (let col = 0; col < nCols; col++) {
-          const dx = startX + col * (ds.w + gap);
-          const dy = rowY; // 上揃え（行内の余白なし）
-          drawImageTransformed(ctx, img, dx, dy, ds.w, ds.h, rotate);
+          // グリッド列インデックス
+          const gridCol = colStart + col;
+          // グリッド列の中心X
+          const cellCenterX = originX + gridCol * gridUnitW + gridUnitW / 2 - gap / 2;
+          // 画像をセル中心に配置
+          const dx = cellCenterX - d.w / 2;
+          drawImageTransformed(ctx, img, dx, curY, d.w, d.h, rotate);
         }
-
-        curY += ds.h + gap;
+        curY += d.h + gap;
       }
 
       // 基準サイズ注記（右下・反転）
@@ -350,8 +330,7 @@
 
       try {
         const img = await loadImage(currentDataURL);
-        const iw  = img.naturalWidth;
-        const ih  = img.naturalHeight;
+        const iw = img.naturalWidth, ih = img.naturalHeight;
         if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
 
         const isPortrait = ih >= iw;
@@ -365,80 +344,171 @@
         const contentW  = PAGE_W - rulerSize * 2;
         const contentH  = PAGE_H - rulerSize * 2;
 
-        function drawSize(cm) {
-          const scale = cmToPx(cm) / longEdge;
-          return { w: effW * scale, h: effH * scale };
+        function ds(cm) {
+          const s = cmToPx(cm) / longEdge;
+          return { w: effW * s, h: effH * s };
         }
 
-        // 実サイズベースの収まり判定
+        // cmList が全部ページに収まるか（実サイズベース）
+        // 横は何枚でも並べられるので、幅チェックは「1枚が収まるか」のみ
         function fits(cmList) {
-          return fitsLayoutExact(cmList, drawSize, contentW, contentH, gap);
+          let totalH = 0;
+          for (let i = 0; i < cmList.length; i++) {
+            const d = ds(cmList[i]);
+            if (d.w > contentW + 0.5) return false; // 1枚でも横に収まらない
+            totalH += d.h + (i > 0 ? gap : 0);
+            if (totalH > contentH + 0.5) return false;
+          }
+          return true;
         }
 
-        // ---- メイン：baseCm中心に ±step で可能な限り拡張 ----
-        function makeCenteredList(step, count) {
-          const half = Math.floor(count / 2);
-          return Array.from({ length: count }, (_, i) =>
-            Math.max(0.1, Math.round((baseCm + (i - half) * step) * 100) / 100)
-          );
+        // アンカーサイズに対して最適なステップを決める
+        // 0.5cm刻みで4種入るなら0.5cm、そうでなければ1cm
+        function calcStep(anchorCm) {
+          const test4half = [
+            Math.max(0.1, anchorCm - 1.5), Math.max(0.1, anchorCm - 0.5),
+            anchorCm + 0.5, anchorCm + 1.5
+          ].map(c => Math.round(c * 100) / 100);
+          return fits([...test4half, anchorCm].sort((a,b)=>a-b)) ? 0.5 : 1.0;
         }
 
-        // 4種以上なら0.5cm刻み、3種以下なら1cm刻みのルールはそのまま
-        const trySets = [
-          [5, 0.5], [4, 0.5],
-          [5, 1.0], [4, 1.0], [3, 1.0], [2, 1.0], [1, 1.0],
-        ];
+        const step = calcStep(baseCm); // メイン用ステップ
 
-        let mainCms = [baseCm], mainStep = 1.0;
-        for (const [count, step] of trySets) {
-          const cms = makeCenteredList(step, count);
-          if (fits(cms)) { mainCms = cms; mainStep = step; break; }
+        // ---- ページを上から埋める関数 ----
+        // startCm から step刻みで上方向（増加）にサイズを追加し、
+        // ページがいっぱいになるまで詰め込む
+        // direction: 'up'=大きい方向, 'down'=小さい方向
+        function fillPage(anchorCm) {
+          // まず anchorCm を中心に上下に広げていく
+          // 結果リスト（上から小→大の順）
+          const list = [anchorCm];
+
+          // 上方向（大きい側）に追加できるだけ追加
+          let upCm = Math.round((anchorCm + step) * 100) / 100;
+          while (true) {
+            const candidate = [...list, upCm].sort((a,b)=>a-b);
+            if (!fits(candidate)) break;
+            list.push(upCm);
+            upCm = Math.round((upCm + step) * 100) / 100;
+          }
+
+          // 下方向（小さい側）に追加できるだけ追加
+          let downCm = Math.max(0.1, Math.round((anchorCm - step) * 100) / 100);
+          while (downCm >= 0.1) {
+            const candidate = [...list, downCm].sort((a,b)=>a-b);
+            if (!fits(candidate)) break;
+            list.push(downCm);
+            const next = Math.round((downCm - step) * 100) / 100;
+            if (next < 0.1) break;
+            downCm = next;
+          }
+
+          return list.sort((a,b) => a - b); // 小→大の順で返す
         }
 
+        // メインページ：baseCm を軸にページを埋める
+        const mainCms = fillPage(baseCm);
         const mainMin = Math.min(...mainCms);
         const mainMax = Math.max(...mainCms);
 
-        // ---- 大きいバージョン：mainMax+step から上へ、入る限り追加 ----
-        function buildLargeList() {
+        // 小さいバージョン：mainMin-step から下方向だけに伸ばしてページを埋める
+        function fillPageDown(startCm) {
+          // startCm から下方向（小さい側）へ入る限り追加
           const list = [];
-          let cm = Math.round((mainMax + mainStep) * 100) / 100;
-          while (true) {
-            const candidate = [...list, cm];
-            if (!fits(candidate)) break;
-            list.push(cm);
-            cm = Math.round((cm + mainStep) * 100) / 100;
-          }
-          return list.length > 0 ? list : null;
-        }
-
-        // ---- 小さいバージョン：mainMin-step から下へ、入る限り追加 ----
-        // 上から大→小の順（大きいものが上）
-        function buildSmallList() {
-          const list = [];
-          let cm = Math.max(0.1, Math.round((mainMin - mainStep) * 100) / 100);
+          let cm = Math.round(startCm * 100) / 100;
           while (cm >= 0.1) {
-            const candidate = [...list, cm];
+            const candidate = [...list, cm].sort((a,b) => a-b);
             if (!fits(candidate)) break;
             list.push(cm);
-            const next = Math.round((cm - mainStep) * 100) / 100;
+            const next = Math.round((cm - step) * 100) / 100;
             if (next < 0.1) break;
             cm = next;
           }
-          return list.length > 0 ? list : null;
+          return list.sort((a,b) => a - b); // 小→大の順
         }
 
-        const largeCms = buildLargeList();
-        const smallCms = buildSmallList();
+        // 大きいバージョン：mainMax+step から上方向だけに伸ばしてページを埋める
+        function fillPageUp(startCm) {
+          const list = [];
+          let cm = Math.round(startCm * 100) / 100;
+          while (true) {
+            const candidate = [...list, cm].sort((a,b) => a-b);
+            if (!fits(candidate)) break;
+            list.push(cm);
+            cm = Math.round((cm + step) * 100) / 100;
+          }
+          return list.sort((a,b) => a - b); // 小→大の順
+        }
+
+        // 小さいバージョン：smallStart を軸に専用stepで埋める
+        const smallStep  = calcStep(Math.max(0.1, Math.round((mainMin - step) * 100) / 100));
+        const smallStart = Math.max(0.1, Math.round((mainMin - smallStep) * 100) / 100);
+        // fillPageDown/Up が参照する step をローカル上書きして呼ぶため、
+        // 小・大専用のfill関数をインラインで定義する
+        function fillPageDownWithStep(startCm, st) {
+          const list = [];
+          let cm = Math.round(startCm * 100) / 100;
+          while (cm >= 0.1) {
+            const candidate = [...list, cm].sort((a,b) => a-b);
+            // fits() は外側の step を使うが、ここでは引数 st で判定し直す
+            let totalH = 0;
+            let ok = true;
+            const sorted = candidate.slice().sort((a,b)=>a-b);
+            for (let i = 0; i < sorted.length; i++) {
+              const d = ds(sorted[i]);
+              if (d.w > contentW + 0.5) { ok = false; break; }
+              totalH += d.h + (i > 0 ? gap : 0);
+              if (totalH > contentH + 0.5) { ok = false; break; }
+            }
+            if (!ok) break;
+            list.push(cm);
+            const next = Math.round((cm - st) * 100) / 100;
+            if (next < 0.1) break;
+            cm = next;
+          }
+          return list.sort((a,b) => a - b);
+        }
+
+        function fillPageUpWithStep(startCm, st) {
+          const list = [];
+          let cm = Math.round(startCm * 100) / 100;
+          while (true) {
+            const candidate = [...list, cm].sort((a,b) => a-b);
+            let totalH = 0;
+            let ok = true;
+            const sorted = candidate.slice().sort((a,b)=>a-b);
+            for (let i = 0; i < sorted.length; i++) {
+              const d = ds(sorted[i]);
+              if (d.w > contentW + 0.5) { ok = false; break; }
+              totalH += d.h + (i > 0 ? gap : 0);
+              if (totalH > contentH + 0.5) { ok = false; break; }
+            }
+            if (!ok) break;
+            list.push(cm);
+            cm = Math.round((cm + st) * 100) / 100;
+          }
+          return list.sort((a,b) => a - b);
+        }
+
+        const smallList  = (smallStart < mainMin) ? fillPageDownWithStep(smallStart, smallStep) : [];
+        const smallCms   = smallList.length > 0 ? smallList : null;
+
+        const largeStep  = calcStep(Math.round((mainMax + step) * 100) / 100);
+        const largeStart = Math.round((mainMax + largeStep) * 100) / 100;
+        const largeList  = fillPageUpWithStep(largeStart, largeStep);
+        const largeCms   = largeList.length > 0 ? largeList : null;
 
         // ---- 描画 ----
-        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms,  baseCm);
-        const largeCanvas = largeCms ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms, baseCm) : null;
-        const smallCanvas = smallCms ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms, baseCm) : null;
+        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms, baseCm);
+        const smallCanvas = (smallCms && smallCms.length > 0)
+          ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms, baseCm) : null;
+        const largeCanvas = (largeCms && largeCms.length > 0)
+          ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms, baseCm) : null;
 
-        // ---- UI反映：メイン→小→大の順 ----
+        // ---- UI反映 ----
         function setCard(imgEl, dlEl, labelEl, canvas, sizes) {
           const card = imgEl.closest('.output-card');
-          if (canvas) {
+          if (canvas && sizes && sizes.length > 0) {
             const url = canvas.toDataURL('image/png');
             imgEl.src = url; dlEl.href = url;
             card.style.display = 'block';
@@ -449,16 +519,15 @@
         }
 
         setCard($id('img-main'),  $id('dl-main'),  $id('label-main'),  mainCanvas,  mainCms);
-        setCard($id('img-small'), $id('dl-small'), $id('label-small'), smallCanvas, smallCms || []);
-        setCard($id('img-large'), $id('dl-large'), $id('label-large'), largeCanvas, largeCms || []);
+        setCard($id('img-small'), $id('dl-small'), $id('label-small'), smallCanvas, smallCms);
+        setCard($id('img-large'), $id('dl-large'), $id('label-large'), largeCanvas, largeCms);
 
         $id('outputSection').style.display = 'flex';
 
-        const stepLabel  = mainStep === 0.5 ? '0.5cm刻み' : '1cm刻み';
         const orientNote = longSideVertical ? '長辺縦' : '長辺横';
-        showStatus(`完了 — ${stepLabel} ${orientNote}　メイン: ${mainCms.map(c=>c.toFixed(1)+'cm').join('/')}`
-          + (smallCms ? `　小: ${smallCms.map(c=>c.toFixed(1)+'cm').join('/')}` : '')
-          + (largeCms ? `　大: ${largeCms.map(c=>c.toFixed(1)+'cm').join('/')}` : ''));
+        showStatus(`完了 — ${orientNote}　メイン(${step===0.5?'0.5cm':'1cm'}刻み): ${mainCms.map(c=>c.toFixed(1)+'cm').join('/')}`
+          + (smallCms && smallCms.length ? `　小(${smallStep===0.5?'0.5cm':'1cm'}刻み): ${smallCms.map(c=>c.toFixed(1)+'cm').join('/')}` : '')
+          + (largeCms && largeCms.length ? `　大(${largeStep===0.5?'0.5cm':'1cm'}刻み): ${largeCms.map(c=>c.toFixed(1)+'cm').join('/')}` : ''));
 
       } catch (err) {
         console.error(err);
