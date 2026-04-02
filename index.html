@@ -114,6 +114,19 @@
     const DPI = 300;
     const $id = (id) => document.getElementById(id);
 
+    // --- 定数 ---
+    function cmToPx(cm) { return (cm / 2.54) * DPI; }
+    function mmToPx(mm) { return (mm / 25.4) * DPI; }
+    const PAGE_W    = Math.round(mmToPx(192.75));
+    const PAGE_H    = Math.round(mmToPx(276.87));
+    const RULER     = Math.round(cmToPx(1.0));   // ルーラー幅 10mm
+    const GAP       = Math.round(cmToPx(0.5));   // 画像間 5mm
+    const CONTENT_W = PAGE_W - RULER * 2;
+    const CONTENT_H = PAGE_H - RULER * 2;
+    const MIN_CM    = 1.0;  // 最小サイズ（1cm未満は作らない）
+    const MAX_COLS  = 4;    // 横に並べる最大枚数
+
+    // --- UI ---
     let longSideVertical = true;
     const orientBtn = $id('orientBtn');
     orientBtn.addEventListener('click', () => {
@@ -170,12 +183,6 @@
       el.className = 'status' + (isError ? ' error' : '');
     }
 
-    function cmToPx(cm) { return (cm / 2.54) * DPI; }
-    function mmToPx(mm) { return (mm / 25.4) * DPI; }
-
-    const PAGE_W = Math.round(mmToPx(192.75));
-    const PAGE_H = Math.round(mmToPx(276.87));
-
     function loadImage(dataURL) {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -196,51 +203,172 @@
       ctx.restore();
     }
 
-    function drawRulers(ctx, originX, originY, contentW, contentH, rulerSize) {
+    function drawRulers(ctx) {
       const oneCm = cmToPx(1), halfCm = cmToPx(0.5);
-      const tickLong = rulerSize * 0.55, tickShort = rulerSize * 0.30;
-      const fontSize = Math.max(10, Math.round(rulerSize * 0.38));
+      const tickL = RULER * 0.55, tickS = RULER * 0.30;
+      const fs = Math.max(10, Math.round(RULER * 0.38));
       ctx.save();
       ctx.lineWidth = Math.max(1, Math.round(cmToPx(0.02)));
-      ctx.font = `${fontSize}px sans-serif`;
+      ctx.font = `${fs}px sans-serif`;
 
+      // 上ルーラー
       ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(originX, 0, contentW, rulerSize);
+      ctx.fillRect(RULER, 0, CONTENT_W, RULER);
       ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
-      ctx.beginPath(); ctx.moveTo(originX, rulerSize); ctx.lineTo(originX + contentW, rulerSize); ctx.stroke();
-      for (let i = 0; i * oneCm <= contentW + 1; i++) {
-        const x = originX + i * oneCm;
-        if (x > originX + contentW + 1) break;
-        ctx.beginPath(); ctx.moveTo(x, rulerSize); ctx.lineTo(x, rulerSize - tickLong); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(RULER, RULER); ctx.lineTo(RULER + CONTENT_W, RULER); ctx.stroke();
+      for (let i = 0; i * oneCm <= CONTENT_W + 1; i++) {
+        const x = RULER + i * oneCm;
+        if (x > RULER + CONTENT_W + 1) break;
+        ctx.beginPath(); ctx.moveTo(x, RULER); ctx.lineTo(x, RULER - tickL); ctx.stroke();
         if (i > 0) {
-          ctx.save(); ctx.translate(x, rulerSize - tickLong - fontSize * 0.1); ctx.scale(-1, 1);
+          ctx.save(); ctx.translate(x, RULER - tickL - fs * 0.1); ctx.scale(-1, 1);
           ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(i), 0, 0); ctx.restore();
         }
         const x5 = x + halfCm;
-        if (x5 <= originX + contentW) { ctx.beginPath(); ctx.moveTo(x5, rulerSize); ctx.lineTo(x5, rulerSize - tickShort); ctx.stroke(); }
+        if (x5 <= RULER + CONTENT_W) { ctx.beginPath(); ctx.moveTo(x5, RULER); ctx.lineTo(x5, RULER - tickS); ctx.stroke(); }
       }
 
+      // 左ルーラー
       ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(0, originY, rulerSize, contentH);
+      ctx.fillRect(0, RULER, RULER, CONTENT_H);
       ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
-      ctx.beginPath(); ctx.moveTo(rulerSize, originY); ctx.lineTo(rulerSize, originY + contentH); ctx.stroke();
-      for (let i = 0; i * oneCm <= contentH + 1; i++) {
-        const y = originY + i * oneCm;
-        if (y > originY + contentH + 1) break;
-        ctx.beginPath(); ctx.moveTo(rulerSize, y); ctx.lineTo(rulerSize - tickLong, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(RULER, RULER); ctx.lineTo(RULER, RULER + CONTENT_H); ctx.stroke();
+      for (let i = 0; i * oneCm <= CONTENT_H + 1; i++) {
+        const y = RULER + i * oneCm;
+        if (y > RULER + CONTENT_H + 1) break;
+        ctx.beginPath(); ctx.moveTo(RULER, y); ctx.lineTo(RULER - tickL, y); ctx.stroke();
         if (i > 0) {
-          ctx.save(); ctx.translate(rulerSize - tickLong - fontSize * 0.15, y); ctx.rotate(-Math.PI / 2);
+          ctx.save(); ctx.translate(RULER - tickL - fs * 0.15, y); ctx.rotate(-Math.PI / 2);
           ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(i), 0, 0); ctx.restore();
         }
         const y5 = y + halfCm;
-        if (y5 <= originY + contentH) { ctx.beginPath(); ctx.moveTo(rulerSize, y5); ctx.lineTo(rulerSize - tickShort, y5); ctx.stroke(); }
+        if (y5 <= RULER + CONTENT_H) { ctx.beginPath(); ctx.moveTo(RULER, y5); ctx.lineTo(RULER - tickS, y5); ctx.stroke(); }
       }
       ctx.fillStyle = '#e0e0e0';
-      ctx.fillRect(0, 0, rulerSize, rulerSize);
+      ctx.fillRect(0, 0, RULER, RULER);
       ctx.restore();
     }
 
-    // cmList を上から順に描画してキャンバスを返す
+    // =====================================================
+    // 核心ロジック：画像サイズ計算・ページ構成・描画
+    // すべて同じ imgPx() 関数を使って一貫性を保証する
+    // =====================================================
+
+    // cm → {w, h} px  ※ effW/effH/longEdge を引数で受け取る
+    function imgPx(cm, effW, effH, longEdge) {
+      const s = cmToPx(cm) / longEdge;
+      return { w: effW * s, h: effH * s };
+    }
+
+    /**
+     * cmList を上から積み上げて「実際に描ける行リスト」を返す。
+     * fits() の代わりにこれを唯一の判定・描画ソースとして使う。
+     * 戻り値: [{ cm, w, h }, ...] （収まる行だけ）
+     */
+    function resolveRows(cmList, effW, effH, longEdge) {
+      const rows = [];
+      let usedH = 0;
+      for (const cm of cmList) {
+        const { w, h } = imgPx(cm, effW, effH, longEdge);
+        const needed = usedH + h + (rows.length > 0 ? GAP : 0);
+        if (needed > CONTENT_H) break;
+        rows.push({ cm, w, h });
+        usedH = needed;
+      }
+      return rows;
+    }
+
+    /**
+     * ページに収まる最大のサイズリストを生成する。
+     * anchor を中心に step 刻みで上下に広げる。
+     * 1cm 未満は作らない。
+     */
+    function buildPageList(anchorCm, step, effW, effH, longEdge) {
+      // まず anchor 単体が入るか確認
+      const base = resolveRows([anchorCm], effW, effH, longEdge);
+      if (base.length === 0) return [anchorCm]; // 入らなくても最低1種は返す
+
+      const list = [anchorCm];
+
+      // 上方向（大きい側）
+      let up = Math.round((anchorCm + step) * 100) / 100;
+      while (true) {
+        const candidate = [...list, up].sort((a, b) => a - b);
+        const rows = resolveRows(candidate, effW, effH, longEdge);
+        if (rows.length < candidate.length) break; // 入りきらなかった
+        list.push(up);
+        up = Math.round((up + step) * 100) / 100;
+      }
+
+      // 下方向（小さい側）
+      let down = Math.round((anchorCm - step) * 100) / 100;
+      while (down >= MIN_CM) {
+        const candidate = [...list, down].sort((a, b) => a - b);
+        const rows = resolveRows(candidate, effW, effH, longEdge);
+        if (rows.length < candidate.length) break;
+        list.push(down);
+        const next = Math.round((down - step) * 100) / 100;
+        if (next < MIN_CM) break;
+        down = next;
+      }
+
+      return list.sort((a, b) => a - b);
+    }
+
+    /**
+     * startCm から下方向のみに拡張するページリスト。
+     * 小さいバージョン用。
+     */
+    function buildPageListDown(startCm, step, effW, effH, longEdge) {
+      const list = [];
+      let cm = Math.round(startCm * 100) / 100;
+      while (cm >= MIN_CM) {
+        const candidate = [...list, cm].sort((a, b) => a - b);
+        const rows = resolveRows(candidate, effW, effH, longEdge);
+        if (rows.length < candidate.length) break;
+        list.push(cm);
+        const next = Math.round((cm - step) * 100) / 100;
+        if (next < MIN_CM) break;
+        cm = next;
+      }
+      return list.sort((a, b) => a - b);
+    }
+
+    /**
+     * startCm から上方向のみに拡張するページリスト。
+     * 大きいバージョン用。
+     */
+    function buildPageListUp(startCm, step, effW, effH, longEdge) {
+      const list = [];
+      let cm = Math.round(startCm * 100) / 100;
+      while (true) {
+        const candidate = [...list, cm].sort((a, b) => a - b);
+        const rows = resolveRows(candidate, effW, effH, longEdge);
+        if (rows.length < candidate.length) break;
+        list.push(cm);
+        cm = Math.round((cm + step) * 100) / 100;
+      }
+      return list.sort((a, b) => a - b);
+    }
+
+    /**
+     * ステップ決定：
+     * anchor を中心に 0.5cm 刻みで 4 種が 1 ページに収まるなら 0.5cm、
+     * そうでなければ 1cm。
+     */
+    function calcStep(anchorCm, effW, effH, longEdge) {
+      const half = Math.floor(4 / 2);
+      const test = Array.from({ length: 4 }, (_, i) =>
+        Math.max(MIN_CM, Math.round((anchorCm + (i - half) * 0.5) * 100) / 100)
+      );
+      const rows = resolveRows(test, effW, effH, longEdge);
+      return rows.length >= 4 ? 0.5 : 1.0;
+    }
+
+    /**
+     * cmList からキャンバスを生成して返す。
+     * resolveRows() で実際に入る行だけを描画するので絶対に重ならない。
+     */
     function buildCanvas(img, effW, effH, longEdge, rotate, cmList, baseCm) {
       const canvas = document.createElement('canvas');
       canvas.width  = PAGE_W;
@@ -251,65 +379,41 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      const rulerSize = Math.round(cmToPx(1.0));
-      const gap       = Math.round(cmToPx(0.5));
-      const originX   = rulerSize;
-      const originY   = rulerSize;
-      const contentW  = PAGE_W - rulerSize * 2;
-      const contentH  = PAGE_H - rulerSize * 2;
+      drawRulers(ctx);
 
-      drawRulers(ctx, originX, originY, contentW, contentH, rulerSize);
+      // resolveRows で実際に入る行だけ取得
+      const rows = resolveRows(cmList, effW, effH, longEdge);
+      if (rows.length === 0) return canvas;
 
-      function ds(cm) {
-        const s = cmToPx(cm) / longEdge;
-        return { w: effW * s, h: effH * s };
-      }
-
-      const sizes = cmList.map(cm => ds(cm));
-      let curY = originY;
-
-      // 各行の列数を計算
-      const nColsPerRow = sizes.map(d =>
-        Math.min(4, Math.max(1, Math.floor((contentW + gap) / (d.w + gap))))
+      // 各行の列数
+      const nColsPerRow = rows.map(({ w }) =>
+        Math.min(MAX_COLS, Math.max(1, Math.floor((CONTENT_W + GAP) / (w + GAP))))
       );
+      const maxCols   = Math.max(...nColsPerRow);
+      const gridUnitW = (CONTENT_W + GAP) / maxCols;
 
-      // 全行の最大列数を基準グリッドとする
-      const maxCols = Math.max(...nColsPerRow);
-
-      // 基準グリッドの列幅：最大列数の行が中央揃えになるよう決定
-      // 各列の中心X座標を maxCols 基準で計算する
-      // colCenters[i] = i番目の列（0始まり）の中心X（originXからの相対）
-      // maxCols列の場合の総幅を求め、その左端をオフセットとする
-      // ただし各行の画像サイズが違うので、列中心だけ共有し幅は各行独自
-      // → maxCols列の「列セル幅」= contentW / maxCols（gap込み）をグリッド単位とする
-      const gridUnitW = (contentW + gap) / maxCols; // 1列分の幅（gap含む）
-
-      for (let row = 0; row < cmList.length; row++) {
-        const d = sizes[row];
-        const nCols = nColsPerRow[row];
-
-        // この行の nCols 枚を、maxCols グリッドの中央に寄せて配置
-        // 中央寄せ：グリッド上で何列目から始めるか
-        const colStart = Math.floor((maxCols - nCols) / 2); // 開始グリッド列インデックス
+      let curY = RULER;
+      for (let row = 0; row < rows.length; row++) {
+        const { w, h } = rows[row];
+        const nCols    = nColsPerRow[row];
+        const colStart = Math.floor((maxCols - nCols) / 2);
 
         for (let col = 0; col < nCols; col++) {
-          // グリッド列インデックス
-          const gridCol = colStart + col;
-          // グリッド列の中心X
-          const cellCenterX = originX + gridCol * gridUnitW + gridUnitW / 2 - gap / 2;
-          // 画像をセル中心に配置
-          const dx = cellCenterX - d.w / 2;
-          drawImageTransformed(ctx, img, dx, curY, d.w, d.h, rotate);
+          const gCol = colStart + col;
+          const cx   = RULER + gCol * gridUnitW + gridUnitW / 2 - GAP / 2;
+          drawImageTransformed(ctx, img, cx - w / 2, curY, w, h, rotate);
         }
-        curY += d.h + gap;
+
+        curY += h;
+        if (row < rows.length - 1) curY += GAP;
       }
 
       // 基準サイズ注記（右下・反転）
-      const noteFontSize = Math.max(10, Math.round(cmToPx(0.28)));
+      const nfs = Math.max(10, Math.round(cmToPx(0.28)));
       ctx.save();
-      ctx.font = `${noteFontSize}px sans-serif`;
+      ctx.font = `${nfs}px sans-serif`;
       ctx.textBaseline = 'bottom'; ctx.fillStyle = '#888';
-      ctx.translate(PAGE_W - rulerSize / 2, PAGE_H - rulerSize / 3);
+      ctx.translate(PAGE_W - RULER / 2, PAGE_H - RULER / 3);
       ctx.scale(-1, 1); ctx.textAlign = 'left';
       ctx.fillText(`基準 ${baseCm.toFixed(1)}cm`, 0, 0);
       ctx.restore();
@@ -317,6 +421,9 @@
       return canvas;
     }
 
+    // =====================================================
+    // メイン生成処理
+    // =====================================================
     async function generate() {
       if (!currentDataURL) return;
 
@@ -339,173 +446,37 @@
         const effH     = rotate ? iw : ih;
         const longEdge = Math.max(effW, effH);
 
-        const rulerSize = Math.round(cmToPx(1.0));
-        const gap       = Math.round(cmToPx(0.5));
-        const contentW  = PAGE_W - rulerSize * 2;
-        const contentH  = PAGE_H - rulerSize * 2;
+        // --- メイン ---
+        const mainStep = calcStep(baseCm, effW, effH, longEdge);
+        const mainCms  = buildPageList(baseCm, mainStep, effW, effH, longEdge);
+        const mainMin  = Math.min(...mainCms);
+        const mainMax  = Math.max(...mainCms);
 
-        function ds(cm) {
-          const s = cmToPx(cm) / longEdge;
-          return { w: effW * s, h: effH * s };
+        // --- 小さいバージョン ---
+        // mainMin より小さいサイズから始める
+        // そのページのアンカーサイズでステップを再計算
+        const smallAnchor = Math.round((mainMin - mainStep) * 100) / 100;
+        let smallCms = null;
+        if (smallAnchor >= MIN_CM) {
+          const smallStep = calcStep(smallAnchor, effW, effH, longEdge);
+          // smallAnchor から下方向へ
+          const start = Math.round(smallAnchor * 100) / 100;
+          const list  = buildPageListDown(start, smallStep, effW, effH, longEdge);
+          if (list.length > 0) smallCms = list;
         }
 
-        // cmList が全部ページに収まるか（実サイズベース）
-        // 横は何枚でも並べられるので、幅チェックは「1枚が収まるか」のみ
-        function fits(cmList) {
-          let totalH = 0;
-          for (let i = 0; i < cmList.length; i++) {
-            const d = ds(cmList[i]);
-            if (d.w > contentW + 0.5) return false; // 1枚でも横に収まらない
-            totalH += d.h + (i > 0 ? gap : 0);
-            if (totalH > contentH + 0.5) return false;
-          }
-          return true;
-        }
+        // --- 大きいバージョン ---
+        const largeAnchor = Math.round((mainMax + mainStep) * 100) / 100;
+        const largeStep   = calcStep(largeAnchor, effW, effH, longEdge);
+        const largeList   = buildPageListUp(largeAnchor, largeStep, effW, effH, longEdge);
+        const largeCms    = largeList.length > 0 ? largeList : null;
 
-        // アンカーサイズに対して最適なステップを決める
-        // 0.5cm刻みで4種入るなら0.5cm、そうでなければ1cm
-        function calcStep(anchorCm) {
-          const test4half = [
-            Math.max(0.1, anchorCm - 1.5), Math.max(0.1, anchorCm - 0.5),
-            anchorCm + 0.5, anchorCm + 1.5
-          ].map(c => Math.round(c * 100) / 100);
-          return fits([...test4half, anchorCm].sort((a,b)=>a-b)) ? 0.5 : 1.0;
-        }
+        // --- 描画 ---
+        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms,  baseCm);
+        const smallCanvas = smallCms ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms, baseCm) : null;
+        const largeCanvas = largeCms ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms, baseCm) : null;
 
-        const step = calcStep(baseCm); // メイン用ステップ
-
-        // ---- ページを上から埋める関数 ----
-        // startCm から step刻みで上方向（増加）にサイズを追加し、
-        // ページがいっぱいになるまで詰め込む
-        // direction: 'up'=大きい方向, 'down'=小さい方向
-        function fillPage(anchorCm) {
-          // まず anchorCm を中心に上下に広げていく
-          // 結果リスト（上から小→大の順）
-          const list = [anchorCm];
-
-          // 上方向（大きい側）に追加できるだけ追加
-          let upCm = Math.round((anchorCm + step) * 100) / 100;
-          while (true) {
-            const candidate = [...list, upCm].sort((a,b)=>a-b);
-            if (!fits(candidate)) break;
-            list.push(upCm);
-            upCm = Math.round((upCm + step) * 100) / 100;
-          }
-
-          // 下方向（小さい側）に追加できるだけ追加
-          let downCm = Math.max(0.1, Math.round((anchorCm - step) * 100) / 100);
-          while (downCm >= 0.1) {
-            const candidate = [...list, downCm].sort((a,b)=>a-b);
-            if (!fits(candidate)) break;
-            list.push(downCm);
-            const next = Math.round((downCm - step) * 100) / 100;
-            if (next < 0.1) break;
-            downCm = next;
-          }
-
-          return list.sort((a,b) => a - b); // 小→大の順で返す
-        }
-
-        // メインページ：baseCm を軸にページを埋める
-        const mainCms = fillPage(baseCm);
-        const mainMin = Math.min(...mainCms);
-        const mainMax = Math.max(...mainCms);
-
-        // 小さいバージョン：mainMin-step から下方向だけに伸ばしてページを埋める
-        function fillPageDown(startCm) {
-          // startCm から下方向（小さい側）へ入る限り追加
-          const list = [];
-          let cm = Math.round(startCm * 100) / 100;
-          while (cm >= 0.1) {
-            const candidate = [...list, cm].sort((a,b) => a-b);
-            if (!fits(candidate)) break;
-            list.push(cm);
-            const next = Math.round((cm - step) * 100) / 100;
-            if (next < 0.1) break;
-            cm = next;
-          }
-          return list.sort((a,b) => a - b); // 小→大の順
-        }
-
-        // 大きいバージョン：mainMax+step から上方向だけに伸ばしてページを埋める
-        function fillPageUp(startCm) {
-          const list = [];
-          let cm = Math.round(startCm * 100) / 100;
-          while (true) {
-            const candidate = [...list, cm].sort((a,b) => a-b);
-            if (!fits(candidate)) break;
-            list.push(cm);
-            cm = Math.round((cm + step) * 100) / 100;
-          }
-          return list.sort((a,b) => a - b); // 小→大の順
-        }
-
-        // 小さいバージョン：smallStart を軸に専用stepで埋める
-        const smallStep  = calcStep(Math.max(0.1, Math.round((mainMin - step) * 100) / 100));
-        const smallStart = Math.max(0.1, Math.round((mainMin - smallStep) * 100) / 100);
-        // fillPageDown/Up が参照する step をローカル上書きして呼ぶため、
-        // 小・大専用のfill関数をインラインで定義する
-        function fillPageDownWithStep(startCm, st) {
-          const list = [];
-          let cm = Math.round(startCm * 100) / 100;
-          while (cm >= 0.1) {
-            const candidate = [...list, cm].sort((a,b) => a-b);
-            // fits() は外側の step を使うが、ここでは引数 st で判定し直す
-            let totalH = 0;
-            let ok = true;
-            const sorted = candidate.slice().sort((a,b)=>a-b);
-            for (let i = 0; i < sorted.length; i++) {
-              const d = ds(sorted[i]);
-              if (d.w > contentW + 0.5) { ok = false; break; }
-              totalH += d.h + (i > 0 ? gap : 0);
-              if (totalH > contentH + 0.5) { ok = false; break; }
-            }
-            if (!ok) break;
-            list.push(cm);
-            const next = Math.round((cm - st) * 100) / 100;
-            if (next < 0.1) break;
-            cm = next;
-          }
-          return list.sort((a,b) => a - b);
-        }
-
-        function fillPageUpWithStep(startCm, st) {
-          const list = [];
-          let cm = Math.round(startCm * 100) / 100;
-          while (true) {
-            const candidate = [...list, cm].sort((a,b) => a-b);
-            let totalH = 0;
-            let ok = true;
-            const sorted = candidate.slice().sort((a,b)=>a-b);
-            for (let i = 0; i < sorted.length; i++) {
-              const d = ds(sorted[i]);
-              if (d.w > contentW + 0.5) { ok = false; break; }
-              totalH += d.h + (i > 0 ? gap : 0);
-              if (totalH > contentH + 0.5) { ok = false; break; }
-            }
-            if (!ok) break;
-            list.push(cm);
-            cm = Math.round((cm + st) * 100) / 100;
-          }
-          return list.sort((a,b) => a - b);
-        }
-
-        const smallList  = (smallStart < mainMin) ? fillPageDownWithStep(smallStart, smallStep) : [];
-        const smallCms   = smallList.length > 0 ? smallList : null;
-
-        const largeStep  = calcStep(Math.round((mainMax + step) * 100) / 100);
-        const largeStart = Math.round((mainMax + largeStep) * 100) / 100;
-        const largeList  = fillPageUpWithStep(largeStart, largeStep);
-        const largeCms   = largeList.length > 0 ? largeList : null;
-
-        // ---- 描画 ----
-        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms, baseCm);
-        const smallCanvas = (smallCms && smallCms.length > 0)
-          ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms, baseCm) : null;
-        const largeCanvas = (largeCms && largeCms.length > 0)
-          ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms, baseCm) : null;
-
-        // ---- UI反映 ----
+        // --- UI反映 ---
         function setCard(imgEl, dlEl, labelEl, canvas, sizes) {
           const card = imgEl.closest('.output-card');
           if (canvas && sizes && sizes.length > 0) {
@@ -525,9 +496,9 @@
         $id('outputSection').style.display = 'flex';
 
         const orientNote = longSideVertical ? '長辺縦' : '長辺横';
-        showStatus(`完了 — ${orientNote}　メイン(${step===0.5?'0.5cm':'1cm'}刻み): ${mainCms.map(c=>c.toFixed(1)+'cm').join('/')}`
-          + (smallCms && smallCms.length ? `　小(${smallStep===0.5?'0.5cm':'1cm'}刻み): ${smallCms.map(c=>c.toFixed(1)+'cm').join('/')}` : '')
-          + (largeCms && largeCms.length ? `　大(${largeStep===0.5?'0.5cm':'1cm'}刻み): ${largeCms.map(c=>c.toFixed(1)+'cm').join('/')}` : ''));
+        showStatus(`完了 — ${orientNote}　メイン(${mainStep===0.5?'0.5':'1'}cm刻み): ${mainCms.map(c=>c.toFixed(1)+'cm').join('/')}`
+          + (smallCms ? `　小(${calcStep(Math.min(...smallCms),effW,effH,longEdge)===0.5?'0.5':'1'}cm刻み): ${smallCms.map(c=>c.toFixed(1)+'cm').join('/')}` : '')
+          + (largeCms ? `　大(${largeStep===0.5?'0.5':'1'}cm刻み): ${largeCms.map(c=>c.toFixed(1)+'cm').join('/')}` : ''));
 
       } catch (err) {
         console.error(err);
