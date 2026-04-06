@@ -79,7 +79,12 @@
     <label for="baseCm">基準サイズ（長辺）</label>
     <input id="baseCm" type="number" inputmode="decimal" min="0.1" max="25" step="0.1" value="7" />
     <span class="unit">cm</span>
-    <span class="hint-small">変更すると自動で再生成します</span>
+  </div>
+  <div class="controls">
+    <label for="stepCm">サイズの刻み幅</label>
+    <input id="stepCm" type="number" inputmode="decimal" min="0.1" max="5" step="0.1" value="" placeholder="自動" />
+    <span class="unit">cm</span>
+    <span class="hint-small">空欄で自動（0.5 or 1cm）</span>
   </div>
 
   <button id="orientBtn">
@@ -158,6 +163,7 @@
     });
     fileInput.addEventListener('change', () => { const f = fileInput.files[0]; if (f) handleFile(f); });
     $id('baseCm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
+    $id('stepCm').addEventListener('input',  () => { if (currentDataURL) scheduleGenerate(); });
 
     let currentDataURL = null, generateTimer = null;
 
@@ -385,25 +391,16 @@
       const rows = resolveRows(cmList, effW, effH, longEdge);
       if (rows.length === 0) return canvas;
 
-      // 各行の列数
-      const nColsPerRow = rows.map(({ w }) =>
-        Math.min(MAX_COLS, Math.max(1, Math.floor((CONTENT_W + GAP) / (w + GAP))))
-      );
-      const maxCols   = Math.max(...nColsPerRow);
-      const gridUnitW = (CONTENT_W + GAP) / maxCols;
-
+      // 各行：最大2枚、行ごとに独立して中央配置（グリッド揃えなし）
       let curY = RULER;
       for (let row = 0; row < rows.length; row++) {
         const { w, h } = rows[row];
-        const nCols    = nColsPerRow[row];
-        const colStart = Math.floor((maxCols - nCols) / 2);
-
+        const nCols     = (w * 2 + GAP <= CONTENT_W) ? 2 : 1;
+        const totalImgW = nCols === 2 ? w * 2 + GAP : w;
+        const startX    = RULER + Math.floor((CONTENT_W - totalImgW) / 2);
         for (let col = 0; col < nCols; col++) {
-          const gCol = colStart + col;
-          const cx   = RULER + gCol * gridUnitW + gridUnitW / 2 - GAP / 2;
-          drawImageTransformed(ctx, img, cx - w / 2, curY, w, h, rotate);
+          drawImageTransformed(ctx, img, startX + col * (w + GAP), curY, w, h, rotate);
         }
-
         curY += h;
         if (row < rows.length - 1) curY += GAP;
       }
@@ -446,8 +443,12 @@
         const effH     = rotate ? iw : ih;
         const longEdge = Math.max(effW, effH);
 
+        // ユーザー指定のステップがあればそれを使う、なければ自動判定
+        const userStep = parseFloat($id('stepCm').value);
+        const hasUserStep = Number.isFinite(userStep) && userStep > 0;
+
         // --- メイン ---
-        const mainStep = calcStep(baseCm, effW, effH, longEdge);
+        const mainStep = hasUserStep ? userStep : calcStep(baseCm, effW, effH, longEdge);
         const mainCms  = buildPageList(baseCm, mainStep, effW, effH, longEdge);
         const mainMin  = Math.min(...mainCms);
         const mainMax  = Math.max(...mainCms);
@@ -458,7 +459,7 @@
         const smallAnchor = Math.round((mainMin - mainStep) * 100) / 100;
         let smallCms = null;
         if (smallAnchor >= MIN_CM) {
-          const smallStep = calcStep(smallAnchor, effW, effH, longEdge);
+          const smallStep = hasUserStep ? userStep : calcStep(smallAnchor, effW, effH, longEdge);
           // smallAnchor から下方向へ
           const start = Math.round(smallAnchor * 100) / 100;
           const list  = buildPageListDown(start, smallStep, effW, effH, longEdge);
@@ -467,7 +468,7 @@
 
         // --- 大きいバージョン ---
         const largeAnchor = Math.round((mainMax + mainStep) * 100) / 100;
-        const largeStep   = calcStep(largeAnchor, effW, effH, longEdge);
+        const largeStep   = hasUserStep ? userStep : calcStep(largeAnchor, effW, effH, longEdge);
         const largeList   = buildPageListUp(largeAnchor, largeStep, effW, effH, longEdge);
         const largeCms    = largeList.length > 0 ? largeList : null;
 
