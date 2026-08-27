@@ -44,7 +44,6 @@
     }
     .controls input[type="number"]:focus { border-color: #0071e3; outline: none; }
     .controls .unit       { font-size: 16px; color: #555; }
-    .controls .hint-small { font-size: 12px; color: #999; }
     #orientBtn {
       display: flex; align-items: center; gap: 8px;
       background: #fff; border-radius: 12px; padding: 12px 16px;
@@ -119,15 +118,14 @@
   </details>
 
   <div class="controls">
-    <label for="baseMm">基準サイズ（長辺）</label>
+    <label for="baseMm">長辺</label>
     <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
     <span class="unit">mm</span>
   </div>
   <div class="controls">
     <label for="stepMm">サイズの刻み幅</label>
-    <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="" placeholder="自動" />
+    <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
     <span class="unit">mm</span>
-    <span class="hint-small">空欄で自動（5mmまたは10mm）</span>
   </div>
 
   <button id="orientBtn">
@@ -155,7 +153,7 @@
     </div>
   </div>
 
-  <div class="app-version">v3</div>
+  <div class="app-version">v4</div>
 
   <script>
     'use strict';
@@ -175,7 +173,7 @@
     const GAP       = Math.round(cmToPx(0.20));    // 各画像ブロック間 2mm
     const CONTENT_W = PAGE_W - PAGE_PAD * 2;
     const CONTENT_H = PAGE_H - PAGE_PAD * 2;
-    const MIN_CM    = 1.0;  // 最小サイズ（1cm未満は作らない）
+    const MIN_CM    = 0.1;  // 最小サイズ 1mm
     const MAX_COLS  = 2;    // 横に並べる最大枚数
 
     // --- UI ---
@@ -214,7 +212,11 @@
     });
     fileInput.addEventListener('change', () => { const f = fileInput.files[0]; if (f) handleFile(f); });
     $id('baseMm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
-    $id('stepMm').addEventListener('input',  () => { if (currentDataURL) scheduleGenerate(); });
+    let stepIsAutomatic = true;
+    $id('stepMm').addEventListener('input', () => {
+      stepIsAutomatic = $id('stepMm').value.trim() === '';
+      if (currentDataURL) scheduleGenerate();
+    });
 
     let currentDataURL = null, generateTimer = null, fileLoadId = 0;
     let currentWasCropped = false;
@@ -659,37 +661,22 @@
     }
 
     /**
-     * ページに収まる最大のサイズリストを生成する。
-     * anchor を中心に step 刻みで上下に広げる。
-     * 1cm 未満は作らない。
+     * anchor が中央に来るよう、step 刻みで小・大を必ず対にして広げる。
      */
     function buildPageList(anchorCm, step, effW, effH, longEdge) {
-      // まず anchor 単体が入るか確認
       const base = resolveRows([anchorCm], effW, effH, longEdge);
       if (base.length === 0) return [anchorCm]; // 入らなくても最低1種は返す
 
       const list = [anchorCm];
-
-      // 上方向（大きい側）
-      let up = Math.round((anchorCm + step) * 100) / 100;
+      let level = 1;
       while (true) {
-        const candidate = [...list, up].sort((a, b) => a - b);
-        const rows = resolveRows(candidate, effW, effH, longEdge);
-        if (rows.length < candidate.length) break; // 入りきらなかった
-        list.push(up);
-        up = Math.round((up + step) * 100) / 100;
-      }
-
-      // 下方向（小さい側）
-      let down = Math.round((anchorCm - step) * 100) / 100;
-      while (down >= MIN_CM) {
-        const candidate = [...list, down].sort((a, b) => a - b);
-        const rows = resolveRows(candidate, effW, effH, longEdge);
-        if (rows.length < candidate.length) break;
-        list.push(down);
-        const next = Math.round((down - step) * 100) / 100;
-        if (next < MIN_CM) break;
-        down = next;
+        const down = Math.round((anchorCm - step * level) * 100) / 100;
+        const up = Math.round((anchorCm + step * level) * 100) / 100;
+        if (down < MIN_CM) break;
+        const pair = [...list, down, up].sort((a, b) => a - b);
+        if (resolveRows(pair, effW, effH, longEdge).length < pair.length) break;
+        list.push(down, up);
+        level++;
       }
 
       return list.sort((a, b) => a - b);
@@ -792,7 +779,7 @@
       const baseMm = parseFloat($id('baseMm').value);
       const baseCm = baseMm / 10;
       if (!Number.isFinite(baseMm) || baseMm <= 0) {
-        showStatus('基準サイズに正の数値を入力してください', true);
+        showStatus('長辺に正の数値を入力してください', true);
         return;
       }
 
@@ -809,34 +796,35 @@
         const effH     = rotate ? iw : ih;
         const longEdge = Math.max(effW, effH);
 
-        // ユーザー指定のステップがあればそれを使う、なければ自動判定
+        // 未編集なら自動判定値を入力欄へ表示し、編集後はその値を全ページで使う。
         const userStepMm = parseFloat($id('stepMm').value);
-        const userStep = userStepMm / 10;
-        const hasUserStep = Number.isFinite(userStepMm) && userStepMm > 0;
+        if (!stepIsAutomatic && (!Number.isFinite(userStepMm) || userStepMm <= 0)) {
+          showStatus('サイズの刻み幅に正の数値を入力してください', true);
+          return;
+        }
 
         // --- メイン ---
-        const mainStep = hasUserStep ? userStep : calcStep(baseCm, effW, effH, longEdge);
+        const mainStep = stepIsAutomatic
+          ? calcStep(baseCm, effW, effH, longEdge)
+          : userStepMm / 10;
+        if (stepIsAutomatic) $id('stepMm').value = String(Math.round(mainStep * 10));
         const mainCms  = buildPageList(baseCm, mainStep, effW, effH, longEdge);
         const mainMin  = Math.min(...mainCms);
         const mainMax  = Math.max(...mainCms);
 
         // --- 小さいバージョン ---
         // mainMin より小さいサイズから始める
-        // そのページのアンカーサイズでステップを再計算
         const smallAnchor = Math.round((mainMin - mainStep) * 100) / 100;
         let smallCms = null;
         if (smallAnchor >= MIN_CM) {
-          const smallStep = hasUserStep ? userStep : calcStep(smallAnchor, effW, effH, longEdge);
-          // smallAnchor から下方向へ
           const start = Math.round(smallAnchor * 100) / 100;
-          const list  = buildPageListDown(start, smallStep, effW, effH, longEdge);
+          const list  = buildPageListDown(start, mainStep, effW, effH, longEdge);
           if (list.length > 0) smallCms = list;
         }
 
         // --- 大きいバージョン ---
         const largeAnchor = Math.round((mainMax + mainStep) * 100) / 100;
-        const largeStep   = hasUserStep ? userStep : calcStep(largeAnchor, effW, effH, longEdge);
-        const largeList   = buildPageListUp(largeAnchor, largeStep, effW, effH, longEdge);
+        const largeList   = buildPageListUp(largeAnchor, mainStep, effW, effH, longEdge);
         const largeCms    = largeList.length > 0 ? largeList : null;
 
         // --- 描画 ---
