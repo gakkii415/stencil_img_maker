@@ -175,7 +175,7 @@
       </label>
     </div>
     <button id="orientBtn" type="button">
-      <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：縦</span></span>
+      <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
     </button>
   </section>
 
@@ -199,7 +199,7 @@
     </div>
   </div>
 
-  <div class="app-version">v10</div>
+  <div class="app-version">v11</div>
 
   <script>
     'use strict';
@@ -223,7 +223,7 @@
     const MAX_COLS  = 2;    // 横に並べる最大枚数
 
     // --- UI ---
-    let longSideVertical = true;
+    let longSideVertical = false;
     const orientBtn = $id('orientBtn');
     orientBtn.addEventListener('click', () => {
       longSideVertical = !longSideVertical;
@@ -237,9 +237,21 @@
     }
     updateOrientBtn();
 
-    function setOrientationFromDimensions(width, height) {
-      longSideVertical = height >= width;
+    /**
+     * 自動配置では長辺を横にそろえる。
+     * 縦長画像は90度回転し、横長画像はそのまま使うため、
+     * アップロードやトリミングのたびに元画像の向きが変わっても結果が安定する。
+     */
+    function setAutomaticPlacementFromDimensions(width, height) {
+      if (!(width > 0 && height > 0)) return;
+      longSideVertical = false;
+      orientBtn.dataset.autoRotation = height > width ? 'rotated' : 'unchanged';
       updateOrientBtn();
+    }
+
+    function shouldRotateForPlacement(width, height) {
+      const isPortrait = height > width;
+      return longSideVertical ? !isPortrait : isPortrait;
     }
 
     const dropZone  = $id('dropZone');
@@ -306,7 +318,7 @@
           currentCropRect = { ...result.cropRect };
           autoCropRect = { ...result.cropRect };
           $id('cropSection').style.display = 'block';
-          setOrientationFromDimensions(result.cropRect.w, result.cropRect.h);
+          setAutomaticPlacementFromDimensions(result.cropRect.w, result.cropRect.h);
           dropZone.querySelector('.sub-text').textContent = result.cropped
             ? '余白を自動トリミング済み・タップで画像変更'
             : '余白調整不要・タップで画像変更';
@@ -322,7 +334,7 @@
           currentCropRect = { ...fullRect };
           autoCropRect = { ...fullRect };
           $id('cropSection').style.display = 'block';
-          setOrientationFromDimensions(fullRect.w, fullRect.h);
+          setAutomaticPlacementFromDimensions(fullRect.w, fullRect.h);
           dropZone.querySelector('.sub-text').textContent = '画像をそのまま使用・タップで画像変更';
           scheduleGenerate();
         }
@@ -473,7 +485,7 @@
       dropZone.querySelector('.sub-text').textContent = currentWasCropped
         ? 'トリミング調整済み・タップで画像変更'
         : '画像全体を使用・タップで画像変更';
-      setOrientationFromDimensions(currentCropRect.w, currentCropRect.h);
+      setAutomaticPlacementFromDimensions(currentCropRect.w, currentCropRect.h);
       cropSection.open = false;
       scheduleGenerate();
     });
@@ -488,7 +500,7 @@
 
     function syncOrientationFromCropRect() {
       if (!editorRect) return;
-      setOrientationFromDimensions(editorRect.w, editorRect.h);
+      setAutomaticPlacementFromDimensions(editorRect.w, editorRect.h);
     }
 
     function sizeCropCanvas() {
@@ -871,8 +883,7 @@
         const iw = img.naturalWidth, ih = img.naturalHeight;
         if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
 
-        const isPortrait = ih > iw;
-        const rotate   = longSideVertical ? !isPortrait : isPortrait;
+        const rotate   = shouldRotateForPlacement(iw, ih);
         const effW     = rotate ? ih : iw;
         const effH     = rotate ? iw : ih;
         const longEdge = Math.max(effW, effH);
