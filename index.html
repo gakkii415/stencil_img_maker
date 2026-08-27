@@ -43,6 +43,7 @@
     #orientBtn:hover { border-color: #0071e3; }
     #orientBtn .icon-wrap { font-size: 28px; line-height: 1; transition: transform 0.3s ease; }
     #orientBtn.landscape .icon-wrap { transform: rotate(90deg); }
+    #orientBtn.auto { border-color: #b8d7f6; background: #f7fbff; }
     #orientBtn .label-main { font-size: 15px; font-weight: bold; }
     #orientBtn .label-sub  { font-size: 12px; color: #888; margin-left: 4px; }
     .status { font-size: 13px; color: #555; margin-bottom: 12px; min-height: 18px; }
@@ -63,6 +64,7 @@
       background: #34c759; color: #fff; border: none; border-radius: 8px;
       cursor: pointer; text-decoration: none;
     }
+    .app-version { margin-top: 18px; text-align: right; font-size: 10px; color: #aaa; }
   </style>
 </head>
 <body>
@@ -87,10 +89,10 @@
     <span class="hint-small">空欄で自動（0.5 or 1cm）</span>
   </div>
 
-  <button id="orientBtn">
+  <button id="orientBtn" class="auto landscape">
     <span class="icon-wrap">📱</span>
-    <span class="label-main" id="orientLabel">長辺：縦</span>
-    <span class="label-sub">タップで横に切り替え</span>
+    <span class="label-main" id="orientLabel">配置：自動（長辺：横）</span>
+    <span class="label-sub">縦長画像は自動で横向きにします</span>
   </button>
 
   <p class="status" id="status">画像を選択すると自動で生成します</p>
@@ -113,41 +115,53 @@
     </div>
   </div>
 
+  <div class="app-version">v1</div>
+
   <script>
     'use strict';
 
     const DPI = 300;
+    const SIZE_CORRECTION = 1.016; // 実測値に合わせて寸法を1.6%拡大
     const $id = (id) => document.getElementById(id);
 
     // --- 定数 ---
-    function cmToPx(cm) { return (cm / 2.54) * DPI; }
+    function cmToPx(cm) { return (cm / 2.54) * DPI * SIZE_CORRECTION; }
     function mmToPx(mm) { return (mm / 25.4) * DPI; }
     const PAGE_W    = Math.round(mmToPx(192.75));
     const PAGE_H    = Math.round(mmToPx(276.87));
-    const RULER     = Math.round(cmToPx(1.0));   // ルーラー幅 10mm
-    const GAP       = Math.round(cmToPx(0.5));   // 画像間 5mm
-    const CONTENT_W = PAGE_W - RULER * 2;
-    const CONTENT_H = PAGE_H - RULER * 2;
+    const PAGE_PAD  = Math.round(mmToPx(3));       // ページ端の安全余白 3mm
+    const RULER     = Math.round(cmToPx(0.24));    // 個別ルーラーの細い帯 2.4mm
+    const RULER_GAP = Math.round(cmToPx(0.06));    // 画像とルーラーの間 0.6mm
+    const GAP       = Math.round(cmToPx(0.20));    // 各画像ブロック間 2mm
+    const CONTENT_W = PAGE_W - PAGE_PAD * 2;
+    const CONTENT_H = PAGE_H - PAGE_PAD * 2;
     const MIN_CM    = 1.0;  // 最小サイズ（1cm未満は作らない）
     const MAX_COLS  = 4;    // 横に並べる最大枚数
 
     // --- UI ---
-    let longSideVertical = true;
+    let orientationMode = 'auto'; // auto → vertical → horizontal
     const orientBtn = $id('orientBtn');
     orientBtn.addEventListener('click', () => {
-      longSideVertical = !longSideVertical;
+      orientationMode = orientationMode === 'auto'
+        ? 'vertical'
+        : orientationMode === 'vertical' ? 'horizontal' : 'auto';
       updateOrientBtn();
       if (currentDataURL) scheduleGenerate();
     });
     function updateOrientBtn() {
-      if (longSideVertical) {
+      orientBtn.classList.toggle('auto', orientationMode === 'auto');
+      if (orientationMode === 'auto') {
+        orientBtn.classList.add('landscape');
+        $id('orientLabel').textContent = '配置：自動（長辺：横）';
+        orientBtn.querySelector('.label-sub').textContent = '縦長画像は自動で横向きにします';
+      } else if (orientationMode === 'vertical') {
         orientBtn.classList.remove('landscape');
         $id('orientLabel').textContent = '長辺：縦';
-        orientBtn.querySelector('.label-sub').textContent = 'タップで横に切り替え';
+        orientBtn.querySelector('.label-sub').textContent = 'タップで長辺：横に切り替え';
       } else {
         orientBtn.classList.add('landscape');
         $id('orientLabel').textContent = '長辺：横';
-        orientBtn.querySelector('.label-sub').textContent = 'タップで縦に切り替え';
+        orientBtn.querySelector('.label-sub').textContent = 'タップで自動に戻す';
       }
     }
 
@@ -165,15 +179,35 @@
     $id('baseCm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
     $id('stepCm').addEventListener('input',  () => { if (currentDataURL) scheduleGenerate(); });
 
-    let currentDataURL = null, generateTimer = null;
+    let currentDataURL = null, generateTimer = null, fileLoadId = 0;
+    let currentWasCropped = false;
 
     function handleFile(file) {
+      const loadId = ++fileLoadId;
       dropZone.classList.add('has-file');
       dropZone.querySelector('.main-text').textContent = file.name;
-      dropZone.querySelector('.sub-text').textContent  = '別の画像を選ぶにはタップ';
-      showStatus('読み込み中…');
+      dropZone.querySelector('.sub-text').textContent  = '余白を自動調整します';
+      showStatus('読み込み・余白判定中…');
       const reader = new FileReader();
-      reader.onload  = (e) => { currentDataURL = e.target.result; scheduleGenerate(); };
+      reader.onload = async (e) => {
+        try {
+          const result = await autoCropDataURL(e.target.result);
+          if (loadId !== fileLoadId) return;
+          currentDataURL = result.dataURL;
+          currentWasCropped = result.cropped;
+          dropZone.querySelector('.sub-text').textContent = result.cropped
+            ? '余白を自動トリミング済み・タップで画像変更'
+            : '余白調整不要・タップで画像変更';
+          scheduleGenerate();
+        } catch (err) {
+          if (loadId !== fileLoadId) return;
+          console.warn('自動トリミングを省略しました', err);
+          currentDataURL = e.target.result;
+          currentWasCropped = false;
+          dropZone.querySelector('.sub-text').textContent = '画像をそのまま使用・タップで画像変更';
+          scheduleGenerate();
+        }
+      };
       reader.onerror = ()  => showStatus('ファイルの読み込みに失敗しました', true);
       reader.readAsDataURL(file);
     }
@@ -198,6 +232,81 @@
       });
     }
 
+    /**
+     * 四隅の色を背景色とみなし、大きな単色・透明余白を自動で除去する。
+     * 内容を切り詰めないよう検出範囲の外側に1%の安全余白を残す。
+     */
+    async function autoCropDataURL(dataURL) {
+      const img = await loadImage(dataURL);
+      const maxSide = 1600;
+      const analysisScale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const aw = Math.max(1, Math.round(img.naturalWidth * analysisScale));
+      const ah = Math.max(1, Math.round(img.naturalHeight * analysisScale));
+      const canvas = document.createElement('canvas');
+      canvas.width = aw; canvas.height = ah;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, aw, ah);
+      const pixels = ctx.getImageData(0, 0, aw, ah).data;
+
+      // 透明ピクセルは白に合成してから比較する。
+      const composite = (index, channel) => {
+        const alpha = pixels[index + 3] / 255;
+        return Math.round(pixels[index + channel] * alpha + 255 * (1 - alpha));
+      };
+      const samples = [[], [], []];
+      const patch = Math.max(2, Math.min(24, Math.round(Math.min(aw, ah) * 0.025)));
+      const corners = [[0, 0], [aw - patch, 0], [0, ah - patch], [aw - patch, ah - patch]];
+      for (const [sx, sy] of corners) {
+        for (let y = sy; y < sy + patch; y++) {
+          for (let x = sx; x < sx + patch; x++) {
+            const i = (y * aw + x) * 4;
+            samples[0].push(composite(i, 0));
+            samples[1].push(composite(i, 1));
+            samples[2].push(composite(i, 2));
+          }
+        }
+      }
+      const median = (values) => {
+        values.sort((a, b) => a - b);
+        return values[Math.floor(values.length / 2)];
+      };
+      const bg = samples.map(median);
+      const thresholdSq = 30 * 30;
+      let minX = aw, minY = ah, maxX = -1, maxY = -1;
+      for (let y = 0; y < ah; y++) {
+        for (let x = 0; x < aw; x++) {
+          const i = (y * aw + x) * 4;
+          const dr = composite(i, 0) - bg[0];
+          const dg = composite(i, 1) - bg[1];
+          const db = composite(i, 2) - bg[2];
+          if (dr * dr + dg * dg + db * db > thresholdSq) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if (maxX < minX || maxY < minY) return { dataURL, cropped: false };
+      const pad = Math.max(2, Math.round(Math.max(aw, ah) * 0.01));
+      minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+      maxX = Math.min(aw - 1, maxX + pad); maxY = Math.min(ah - 1, maxY + pad);
+      const cropW = maxX - minX + 1, cropH = maxY - minY + 1;
+      if (cropW / aw > 0.97 && cropH / ah > 0.97) return { dataURL, cropped: false };
+
+      const sourceX = Math.max(0, Math.floor(minX / analysisScale));
+      const sourceY = Math.max(0, Math.floor(minY / analysisScale));
+      const sourceW = Math.min(img.naturalWidth - sourceX, Math.ceil(cropW / analysisScale));
+      const sourceH = Math.min(img.naturalHeight - sourceY, Math.ceil(cropH / analysisScale));
+      const cropped = document.createElement('canvas');
+      cropped.width = sourceW; cropped.height = sourceH;
+      cropped.getContext('2d').drawImage(
+        img, sourceX, sourceY, sourceW, sourceH, 0, 0, sourceW, sourceH
+      );
+      return { dataURL: cropped.toDataURL('image/png'), cropped: true };
+    }
+
     function drawImageTransformed(ctx, img, x, y, w, h, rotate) {
       ctx.save();
       ctx.translate(x + w / 2, y + h / 2);
@@ -209,49 +318,67 @@
       ctx.restore();
     }
 
-    function drawRulers(ctx) {
-      const oneCm = cmToPx(1), halfCm = cmToPx(0.5);
-      const tickL = RULER * 0.55, tickS = RULER * 0.30;
-      const fs = Math.max(10, Math.round(RULER * 0.38));
+    function formatCm(value) {
+      return `${value.toFixed(1)}cm`;
+    }
+
+    /** 画像ごとに、上と左へ細い0.5cm刻みの物差しを描く。 */
+    function drawMiniRulers(ctx, x, y, w, h) {
+      const tickLong = RULER * 0.58, tickShort = RULER * 0.34;
+      const fontSize = Math.max(12, Math.round(cmToPx(0.18)));
+      const horizontalY = y - RULER_GAP;
+      const verticalX = x - RULER_GAP;
+      const widthCm = w / cmToPx(1);
+      const heightCm = h / cmToPx(1);
+
       ctx.save();
-      ctx.lineWidth = Math.max(1, Math.round(cmToPx(0.02)));
-      ctx.font = `${fs}px sans-serif`;
+      ctx.strokeStyle = '#555'; ctx.fillStyle = '#444';
+      ctx.lineWidth = Math.max(1, Math.round(mmToPx(0.12)));
+      ctx.font = `${fontSize}px sans-serif`;
 
-      // 上ルーラー
-      ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(RULER, 0, CONTENT_W, RULER);
-      ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
-      ctx.beginPath(); ctx.moveTo(RULER, RULER); ctx.lineTo(RULER + CONTENT_W, RULER); ctx.stroke();
-      for (let i = 0; i * oneCm <= CONTENT_W + 1; i++) {
-        const x = RULER + i * oneCm;
-        if (x > RULER + CONTENT_W + 1) break;
-        ctx.beginPath(); ctx.moveTo(x, RULER); ctx.lineTo(x, RULER - tickL); ctx.stroke();
-        if (i > 0) {
-          ctx.save(); ctx.translate(x, RULER - tickL - fs * 0.1); ctx.scale(-1, 1);
-          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(i), 0, 0); ctx.restore();
-        }
-        const x5 = x + halfCm;
-        if (x5 <= RULER + CONTENT_W) { ctx.beginPath(); ctx.moveTo(x5, RULER); ctx.lineTo(x5, RULER - tickS); ctx.stroke(); }
+      // 上の物差し
+      ctx.beginPath(); ctx.moveTo(x, horizontalY); ctx.lineTo(x + w, horizontalY); ctx.stroke();
+      for (let d = 0; d <= widthCm + 0.001; d += 0.5) {
+        const px = x + cmToPx(d);
+        const major = Math.abs(d - Math.round(d)) < 0.01;
+        ctx.beginPath();
+        ctx.moveTo(px, horizontalY);
+        ctx.lineTo(px, horizontalY - (major ? tickLong : tickShort));
+        ctx.stroke();
       }
 
-      // 左ルーラー
-      ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(0, RULER, RULER, CONTENT_H);
-      ctx.strokeStyle = '#444'; ctx.fillStyle = '#444';
-      ctx.beginPath(); ctx.moveTo(RULER, RULER); ctx.lineTo(RULER, RULER + CONTENT_H); ctx.stroke();
-      for (let i = 0; i * oneCm <= CONTENT_H + 1; i++) {
-        const y = RULER + i * oneCm;
-        if (y > RULER + CONTENT_H + 1) break;
-        ctx.beginPath(); ctx.moveTo(RULER, y); ctx.lineTo(RULER - tickL, y); ctx.stroke();
-        if (i > 0) {
-          ctx.save(); ctx.translate(RULER - tickL - fs * 0.15, y); ctx.rotate(-Math.PI / 2);
-          ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(i), 0, 0); ctx.restore();
-        }
-        const y5 = y + halfCm;
-        if (y5 <= RULER + CONTENT_H) { ctx.beginPath(); ctx.moveTo(RULER, y5); ctx.lineTo(RULER - tickS, y5); ctx.stroke(); }
+      // 左の物差し
+      ctx.beginPath(); ctx.moveTo(verticalX, y); ctx.lineTo(verticalX, y + h); ctx.stroke();
+      for (let d = 0; d <= heightCm + 0.001; d += 0.5) {
+        const py = y + cmToPx(d);
+        const major = Math.abs(d - Math.round(d)) < 0.01;
+        ctx.beginPath();
+        ctx.moveTo(verticalX, py);
+        ctx.lineTo(verticalX - (major ? tickLong : tickShort), py);
+        ctx.stroke();
       }
-      ctx.fillStyle = '#e0e0e0';
-      ctx.fillRect(0, 0, RULER, RULER);
+
+      // 実寸値は白抜きで読みやすくし、定規の帯を太くしない。
+      const topLabel = formatCm(widthCm);
+      const topWidth = ctx.measureText(topLabel).width;
+      const topX = x + w / 2;
+      const topY = horizontalY - fontSize * 0.2;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(topX - topWidth / 2 - 4, topY - fontSize, topWidth + 8, fontSize + 4);
+      ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(topLabel, topX, topY);
+
+      const sideLabel = formatCm(heightCm);
+      const sideWidth = ctx.measureText(sideLabel).width;
+      const sideX = verticalX - fontSize * 0.2;
+      const sideY = y + h / 2;
+      ctx.save();
+      ctx.translate(sideX, sideY); ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(-sideWidth / 2 - 4, -fontSize, sideWidth + 8, fontSize + 4);
+      ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(sideLabel, 0, 0);
+      ctx.restore();
       ctx.restore();
     }
 
@@ -276,9 +403,11 @@
       let usedH = 0;
       for (const cm of cmList) {
         const { w, h } = imgPx(cm, effW, effH, longEdge);
-        const needed = usedH + h + (rows.length > 0 ? GAP : 0);
-        if (needed > CONTENT_H) break;
-        rows.push({ cm, w, h });
+        const itemW = RULER + RULER_GAP + w;
+        const itemH = RULER + RULER_GAP + h;
+        const needed = usedH + itemH + (rows.length > 0 ? GAP : 0);
+        if (needed > CONTENT_H || itemW > CONTENT_W) break;
+        rows.push({ cm, w, h, itemW, itemH });
         usedH = needed;
       }
       return rows;
@@ -385,23 +514,28 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      drawRulers(ctx);
-
       // resolveRows で実際に入る行だけ取得
       const rows = resolveRows(cmList, effW, effH, longEdge);
       if (rows.length === 0) return canvas;
 
-      // 各行：最大2枚、行ごとに独立して中央配置（グリッド揃えなし）
-      let curY = RULER;
+      // 各行：入る枚数を自動計算し、行ごとに独立して中央配置する。
+      let curY = PAGE_PAD;
       for (let row = 0; row < rows.length; row++) {
-        const { w, h } = rows[row];
-        const nCols     = (w * 2 + GAP <= CONTENT_W) ? 2 : 1;
-        const totalImgW = nCols === 2 ? w * 2 + GAP : w;
-        const startX    = RULER + Math.floor((CONTENT_W - totalImgW) / 2);
+        const { w, h, itemW, itemH } = rows[row];
+        const nCols = Math.max(1, Math.min(
+          MAX_COLS,
+          Math.floor((CONTENT_W + GAP) / (itemW + GAP))
+        ));
+        const totalRowW = itemW * nCols + GAP * (nCols - 1);
+        const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
         for (let col = 0; col < nCols; col++) {
-          drawImageTransformed(ctx, img, startX + col * (w + GAP), curY, w, h, rotate);
+          const itemX = startX + col * (itemW + GAP);
+          const imageX = itemX + RULER + RULER_GAP;
+          const imageY = curY + RULER + RULER_GAP;
+          drawMiniRulers(ctx, imageX, imageY, w, h);
+          drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
         }
-        curY += h;
+        curY += itemH;
         if (row < rows.length - 1) curY += GAP;
       }
 
@@ -410,7 +544,7 @@
       ctx.save();
       ctx.font = `${nfs}px sans-serif`;
       ctx.textBaseline = 'bottom'; ctx.fillStyle = '#888';
-      ctx.translate(PAGE_W - RULER / 2, PAGE_H - RULER / 3);
+      ctx.translate(PAGE_W - PAGE_PAD, PAGE_H - PAGE_PAD / 3);
       ctx.scale(-1, 1); ctx.textAlign = 'left';
       ctx.fillText(`基準 ${baseCm.toFixed(1)}cm`, 0, 0);
       ctx.restore();
@@ -437,7 +571,11 @@
         const iw = img.naturalWidth, ih = img.naturalHeight;
         if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
 
-        const isPortrait = ih >= iw;
+        const isPortrait = ih > iw;
+        const horizontalDoesNotFit = cmToPx(baseCm) + RULER + RULER_GAP > CONTENT_W;
+        const longSideVertical = orientationMode === 'vertical'
+          || (orientationMode === 'auto' && horizontalDoesNotFit);
+        // 自動時は原則横長。横幅に収まらない大サイズだけ縦向きへ退避する。
         const rotate   = longSideVertical ? !isPortrait : isPortrait;
         const effW     = rotate ? ih : iw;
         const effH     = rotate ? iw : ih;
@@ -496,10 +634,15 @@
 
         $id('outputSection').style.display = 'flex';
 
-        const orientNote = longSideVertical ? '長辺縦' : '長辺横';
-        showStatus(`完了 — ${orientNote}　メイン(${mainStep===0.5?'0.5':'1'}cm刻み): ${mainCms.map(c=>c.toFixed(1)+'cm').join('/')}`
-          + (smallCms ? `　小(${calcStep(Math.min(...smallCms),effW,effH,longEdge)===0.5?'0.5':'1'}cm刻み): ${smallCms.map(c=>c.toFixed(1)+'cm').join('/')}` : '')
-          + (largeCms ? `　大(${largeStep===0.5?'0.5':'1'}cm刻み): ${largeCms.map(c=>c.toFixed(1)+'cm').join('/')}` : ''));
+        const orientNote = orientationMode === 'auto'
+          ? (longSideVertical
+            ? '自動配置（大サイズのため長辺縦）'
+            : `自動配置（${isPortrait ? '縦長を横向きに回転' : '横長のまま'}）`)
+          : (longSideVertical ? '長辺縦' : '長辺横');
+        const cropNote = currentWasCropped ? '・余白調整済み' : '';
+        showStatus(`完了 — ${orientNote}${cropNote}　メイン(${mainStep.toFixed(1)}cm刻み): ${mainCms.map(c=>c.toFixed(1)+'cm').join('/')}`
+          + (smallCms ? `　小: ${smallCms.map(c=>c.toFixed(1)+'cm').join('/')}` : '')
+          + (largeCms ? `　大(${largeStep.toFixed(1)}cm刻み): ${largeCms.map(c=>c.toFixed(1)+'cm').join('/')}` : ''));
 
       } catch (err) {
         console.error(err);
