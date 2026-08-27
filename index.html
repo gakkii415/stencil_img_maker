@@ -9,7 +9,7 @@
     :root {
       --ink: #111827; --muted: #6b7280; --line: #d9dee7; --soft: #f6f7f9;
       --accent: #155eef; --accent-soft: #eef4ff; --success: #16794a;
-      --radius: 14px; --shadow: 0 1px 2px rgba(17,24,39,.04), 0 10px 30px rgba(17,24,39,.04);
+      --radius: 10px;
     }
     * { box-sizing: border-box; }
     html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
@@ -21,68 +21,63 @@
     }
     button, input, summary { font: inherit; }
     button, summary { -webkit-tap-highlight-color: transparent; }
-    .app-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-    .eyebrow { margin: 0 0 4px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+    .app-header { margin-bottom: 18px; }
     h1 { margin: 0; font-size: 23px; line-height: 1.15; letter-spacing: -.025em; }
-    .spec { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-weight: 600; }
     #dropZone {
-      display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 12px;
-      width: 100%; padding: 18px; margin-bottom: 12px; cursor: pointer;
-      border: 1.5px dashed #aab3c2; border-radius: var(--radius); background: var(--soft);
+      display: grid; grid-template-columns: 48px 1fr; align-items: center; gap: 15px;
+      width: 100%; min-height: 112px; padding: 26px 20px; margin-bottom: 14px; cursor: pointer;
+      border: 1.5px dashed #9aa4b2; border-radius: var(--radius); background: var(--soft);
       text-align: left; transition: border-color .18s, background .18s;
     }
     #dropZone.over { border-color: var(--accent); background: var(--accent-soft); }
     #dropZone.has-file { border-style: solid; border-color: #a9d5bf; background: #f4fbf7; }
     .upload-mark {
-      width: 40px; height: 40px; display: grid; place-items: center;
-      border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink);
+      width: 48px; height: 48px; display: grid; place-items: center;
+      border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
     }
-    .upload-mark svg { width: 20px; height: 20px; }
-    #dropZone .main-text { min-width: 0; color: var(--ink); font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+    .upload-mark svg { width: 22px; height: 22px; }
+    #dropZone .main-text { min-width: 0; color: var(--ink); font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
     #dropZone .sub-text { margin-top: 3px; color: var(--muted); font-size: 12px; }
     #fileInput { display: none; }
     .crop-section {
-      display: none; width: 100%; margin-bottom: 16px;
-      border: 1px solid var(--line); border-radius: var(--radius); background: #fff; overflow: hidden;
-      box-shadow: var(--shadow);
+      display: none; width: 100%; margin: -2px 0 14px;
+      border: 0; background: #fff;
     }
     .crop-section summary {
-      position: relative; padding: 14px 44px 14px 16px; cursor: pointer; list-style: none;
-      font-size: 13px; font-weight: 700;
+      position: relative; width: max-content; max-width: 100%; padding: 8px 26px 8px 0;
+      cursor: pointer; list-style: none; color: var(--muted); font-size: 12px; font-weight: 600;
     }
     .crop-section summary::-webkit-details-marker { display: none; }
     .crop-section summary::after {
-      content: "▼"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-      color: var(--muted); font-size: 11px; transition: transform .18s;
+      content: "▼"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      color: #8b93a1; font-size: 9px; transition: transform .18s;
     }
-    .crop-section[open] summary { border-bottom: 1px solid var(--line); }
     .crop-section[open] summary::after { transform: translateY(-50%) rotate(180deg); }
-    .crop-content { padding: 14px; }
-    .crop-help { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .crop-content { padding: 10px 0 4px; border-top: 1px solid var(--line); }
     .crop-stage {
       width: 100%; min-height: 210px; max-height: 60dvh; padding: 0;
       display: flex; align-items: center; justify-content: center;
-      overflow: hidden; border: 1px solid #303641; border-radius: 10px; background: #171a20;
+      overflow: hidden; border: 1px solid #303641; border-radius: 4px; background: #171a20;
     }
     #cropCanvas { display: block; max-width: 100%; max-height: 58dvh; touch-action: none; }
     .crop-tools, .crop-actions { display: flex; gap: 8px; margin-top: 10px; }
     .crop-tools button, .crop-actions button {
       flex: 1; min-width: 0; min-height: 44px; padding: 10px 8px; cursor: pointer;
-      border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink);
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
       font-size: 13px; font-weight: 700;
     }
     .crop-actions #cropApplyBtn { border-color: var(--accent); background: var(--accent); color: #fff; }
     .tool-panel {
-      margin-bottom: 16px; padding: 16px; border: 1px solid var(--line);
-      border-radius: var(--radius); background: #fff; box-shadow: var(--shadow);
+      margin-bottom: 16px; padding: 16px 0;
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fff;
     }
     .panel-title { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .settings-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
     .field { display: block; min-width: 0; }
     .field-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
     .input-shell {
       display: flex; align-items: center; width: 100%; height: 48px;
-      border: 1px solid var(--line); border-radius: 10px; background: var(--soft); overflow: hidden;
+      border: 1px solid var(--line); border-radius: 6px; background: var(--soft); overflow: hidden;
     }
     .input-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: #fff; }
     .input-shell input {
@@ -91,32 +86,32 @@
       font-size: 21px; font-weight: 700; text-align: right;
     }
     .input-shell .unit { padding-right: 12px; color: var(--muted); font-size: 13px; font-weight: 600; }
-    .orientation-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; }
-    .orientation-label { color: var(--muted); font-size: 11px; font-weight: 700; }
-    .segmented { display: grid; grid-template-columns: 1fr 1fr; width: 174px; padding: 3px; border-radius: 10px; background: var(--soft); }
-    .segmented button {
-      min-height: 36px; padding: 6px 16px; border: 0; border-radius: 8px;
-      background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer;
+    #orientBtn {
+      display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px;
+      margin-top: 14px; padding: 10px 12px; cursor: pointer;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
+      font-size: 13px; font-weight: 700;
     }
-    .segmented button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(17,24,39,.12); }
+    #orientBtn::after { content: "切り替え"; color: var(--muted); font-size: 11px; font-weight: 500; }
     .status { margin: 0 0 12px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
     .status:empty { display: none; }
     .error { color: #b42318; }
     .output-section { display: none; flex-direction: column; gap: 14px; width: 100%; min-width: 0; }
     .output-card {
-      width: 100%; min-width: 0; padding: 14px; overflow: hidden;
-      border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow);
+      width: 100%; min-width: 0; padding: 18px 0 0; overflow: hidden;
+      border-top: 1px solid var(--line); background: #fff;
     }
     .output-card .card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; color: var(--ink); font-size: 13px; font-weight: 700; }
-    .badge { padding: 3px 7px; border-radius: 6px; color: #fff; font-size: 9px; font-weight: 800; letter-spacing: .04em; white-space: nowrap; }
-    .badge-main { background: var(--accent); }
-    .badge-small { background: #667085; }
-    .badge-large { background: #9a4c16; }
+    .badge {
+      padding: 0; border: 0; border-radius: 0; background: #fff; color: var(--ink);
+      font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
+    }
+    .badge-main, .badge-small, .badge-large { background: #fff; color: var(--ink); }
     .output-card .card-title span:last-child { min-width: 0; overflow-wrap: anywhere; }
-    .output-card img { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; }
+    .output-card img { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
     .photo-save {
       width: 100%; min-height: 44px; margin-top: 10px; padding: 10px 16px; cursor: pointer;
-      border: 0; border-radius: 9px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700;
+      border: 0; border-radius: 6px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700;
     }
     .photo-save:disabled { opacity: .4; cursor: default; }
     .app-version { margin-top: 16px; color: #a0a7b2; font-size: 9px; text-align: right; }
@@ -124,11 +119,7 @@
 </head>
 <body>
   <header class="app-header">
-    <div>
-      <p class="eyebrow">STENCIL PRODUCTION</p>
-      <h1>A4 Stencil Maker</h1>
-    </div>
-    <span class="spec">A4 · 300 DPI</span>
+    <h1>A4 Stencil Maker</h1>
   </header>
 
   <div id="dropZone">
@@ -146,9 +137,8 @@
   <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif" />
 
   <details class="crop-section" id="cropSection">
-    <summary>トリミングを調整（任意）</summary>
+    <summary>トリミング</summary>
     <div class="crop-content">
-      <p class="crop-help">四隅の丸または枠の内側を動かして範囲を変更できます。</p>
       <div class="crop-stage"><canvas id="cropCanvas"></canvas></div>
       <div class="crop-tools">
         <button id="cropAutoBtn" type="button">自動範囲</button>
@@ -178,13 +168,7 @@
         </span>
       </label>
     </div>
-    <div class="orientation-row">
-      <span class="orientation-label">配置方向</span>
-      <div class="segmented" aria-label="配置方向">
-        <button id="orientVertical" type="button">縦</button>
-        <button id="orientHorizontal" type="button">横</button>
-      </div>
-    </div>
+    <button id="orientBtn" type="button"><span id="orientLabel">配置方向：縦</span></button>
   </section>
 
   <p class="status" id="status">画像を選択すると自動で生成します</p>
@@ -207,7 +191,7 @@
     </div>
   </div>
 
-  <div class="app-version">v5</div>
+  <div class="app-version">v6</div>
 
   <script>
     'use strict';
@@ -232,20 +216,15 @@
 
     // --- UI ---
     let longSideVertical = true;
-    const orientVertical = $id('orientVertical');
-    const orientHorizontal = $id('orientHorizontal');
-    orientVertical.addEventListener('click', () => setOrientation(true));
-    orientHorizontal.addEventListener('click', () => setOrientation(false));
-    function setOrientation(vertical) {
-      longSideVertical = vertical;
+    const orientBtn = $id('orientBtn');
+    orientBtn.addEventListener('click', () => {
+      longSideVertical = !longSideVertical;
       updateOrientBtn();
       if (currentDataURL) scheduleGenerate();
-    }
+    });
     function updateOrientBtn() {
-      orientVertical.classList.toggle('active', longSideVertical);
-      orientHorizontal.classList.toggle('active', !longSideVertical);
-      orientVertical.setAttribute('aria-pressed', String(longSideVertical));
-      orientHorizontal.setAttribute('aria-pressed', String(!longSideVertical));
+      $id('orientLabel').textContent = `配置方向：${longSideVertical ? '縦' : '横'}`;
+      orientBtn.setAttribute('aria-label', `配置方向は${longSideVertical ? '縦' : '横'}。タップして切り替え`);
     }
     updateOrientBtn();
 
