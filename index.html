@@ -24,16 +24,17 @@
     .app-header { margin-bottom: 18px; }
     h1 { margin: 0; font-size: 23px; line-height: 1.15; letter-spacing: -.025em; }
     #dropZone {
-      display: grid; grid-template-columns: 48px 1fr; align-items: center; gap: 15px;
-      width: 100%; min-height: 112px; padding: 26px 20px; margin-bottom: 14px; cursor: pointer;
+      display: block; width: 100%; min-height: 156px; padding: 36px 20px;
+      margin-bottom: 14px; cursor: pointer;
       border: 1.5px dashed #9aa4b2; border-radius: var(--radius); background: var(--soft);
-      text-align: left; transition: border-color .18s, background .18s;
+      text-align: center; transition: border-color .18s, background .18s;
     }
     #dropZone.over { border-color: var(--accent); background: var(--accent-soft); }
     #dropZone.has-file { border-style: solid; border-color: #a9d5bf; background: #f4fbf7; }
     .upload-mark {
       width: 48px; height: 48px; display: grid; place-items: center;
-      border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
+      margin: 0 auto 10px; border: 1px solid var(--line); border-radius: 8px;
+      background: #fff; color: var(--ink);
     }
     .upload-mark svg { width: 22px; height: 22px; }
     #dropZone .main-text { min-width: 0; color: var(--ink); font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
@@ -44,13 +45,13 @@
       border: 0; background: #fff;
     }
     .crop-section summary {
-      position: relative; width: max-content; max-width: 100%; padding: 8px 26px 8px 0;
-      cursor: pointer; list-style: none; color: var(--muted); font-size: 12px; font-weight: 600;
+      position: relative; width: 100%; min-height: 46px; padding: 13px 38px 13px 0;
+      cursor: pointer; list-style: none; color: var(--ink); font-size: 14px; font-weight: 700;
     }
     .crop-section summary::-webkit-details-marker { display: none; }
     .crop-section summary::after {
-      content: "▼"; position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-      color: #8b93a1; font-size: 9px; transition: transform .18s;
+      content: "▼"; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 10px; transition: transform .18s;
     }
     .crop-section[open] summary::after { transform: translateY(-50%) rotate(180deg); }
     .crop-content { padding: 10px 0 4px; border-top: 1px solid var(--line); }
@@ -92,7 +93,10 @@
       border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
       font-size: 13px; font-weight: 700;
     }
-    #orientBtn::after { content: "切り替え"; color: var(--muted); font-size: 11px; font-weight: 500; }
+    .orient-current { display: flex; align-items: center; gap: 10px; }
+    .orientation-phone { display: inline-block; font-size: 23px; line-height: 1; transition: transform .2s ease; }
+    #orientBtn.landscape .orientation-phone { transform: rotate(90deg); }
+    #orientBtn::after { content: "切り替え"; color: var(--accent); font-size: 11px; font-weight: 600; }
     .status { margin: 0 0 12px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
     .status:empty { display: none; }
     .error { color: #b42318; }
@@ -103,10 +107,11 @@
     }
     .output-card .card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; color: var(--ink); font-size: 13px; font-weight: 700; }
     .badge {
-      padding: 0; border: 0; border-radius: 0; background: #fff; color: var(--ink);
-      font-size: 11px; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
+      padding: 3px 7px; border: 0; border-radius: 4px;
+      font-size: 10px; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
     }
-    .badge-main, .badge-small, .badge-large { background: #fff; color: var(--ink); }
+    .badge-main { background: var(--accent); color: #fff; }
+    .badge-small, .badge-large { background: #eef0f3; color: #475467; }
     .output-card .card-title span:last-child { min-width: 0; overflow-wrap: anywhere; }
     .output-card img { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
     .photo-save {
@@ -168,7 +173,9 @@
         </span>
       </label>
     </div>
-    <button id="orientBtn" type="button"><span id="orientLabel">配置方向：縦</span></button>
+    <button id="orientBtn" type="button">
+      <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：縦</span></span>
+    </button>
   </section>
 
   <p class="status" id="status">画像を選択すると自動で生成します</p>
@@ -191,7 +198,7 @@
     </div>
   </div>
 
-  <div class="app-version">v6</div>
+  <div class="app-version">v7</div>
 
   <script>
     'use strict';
@@ -224,6 +231,7 @@
     });
     function updateOrientBtn() {
       $id('orientLabel').textContent = `配置方向：${longSideVertical ? '縦' : '横'}`;
+      orientBtn.classList.toggle('landscape', !longSideVertical);
       orientBtn.setAttribute('aria-label', `配置方向は${longSideVertical ? '縦' : '横'}。タップして切り替え`);
     }
     updateOrientBtn();
@@ -436,11 +444,13 @@
     $id('cropAutoBtn').addEventListener('click', () => {
       if (!autoCropRect) return;
       editorRect = { ...autoCropRect };
+      syncOrientationFromCropRect();
       drawCropEditor();
     });
     $id('cropFullBtn').addEventListener('click', () => {
       if (!editorImage) return;
       editorRect = { x: 0, y: 0, w: editorImage.naturalWidth, h: editorImage.naturalHeight };
+      syncOrientationFromCropRect();
       drawCropEditor();
     });
     $id('cropApplyBtn').addEventListener('click', async () => {
@@ -459,7 +469,8 @@
       dropZone.querySelector('.sub-text').textContent = currentWasCropped
         ? 'トリミング調整済み・タップで画像変更'
         : '画像全体を使用・タップで画像変更';
-      await setOrientationFromImage(currentDataURL);
+      longSideVertical = currentCropRect.h >= currentCropRect.w;
+      updateOrientBtn();
       cropSection.open = false;
       scheduleGenerate();
     });
@@ -468,7 +479,14 @@
       if (!originalDataURL || !currentCropRect) return;
       editorImage = await loadImage(originalDataURL);
       editorRect = { ...currentCropRect };
+      syncOrientationFromCropRect();
       requestAnimationFrame(sizeCropCanvas);
+    }
+
+    function syncOrientationFromCropRect() {
+      if (!editorRect) return;
+      longSideVertical = editorRect.h >= editorRect.w;
+      updateOrientBtn();
     }
 
     function sizeCropCanvas() {
@@ -593,6 +611,7 @@
         if (editorDrag.type.includes('e')) rect.w = clamp(start.w + dx, minW, iw - start.x);
       }
       editorRect = rect;
+      syncOrientationFromCropRect();
       drawCropEditor();
     });
 
