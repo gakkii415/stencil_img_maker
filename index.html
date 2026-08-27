@@ -198,7 +198,7 @@
     </div>
   </div>
 
-  <div class="app-version">v8</div>
+  <div class="app-version">v9</div>
 
   <script>
     'use strict';
@@ -472,8 +472,7 @@
       dropZone.querySelector('.sub-text').textContent = currentWasCropped
         ? 'トリミング調整済み・タップで画像変更'
         : '画像全体を使用・タップで画像変更';
-      longSideVertical = currentCropRect.h >= currentCropRect.w;
-      updateOrientBtn();
+      setOrientationFromDimensions(currentCropRect.w, currentCropRect.h);
       cropSection.open = false;
       scheduleGenerate();
     });
@@ -488,8 +487,7 @@
 
     function syncOrientationFromCropRect() {
       if (!editorRect) return;
-      longSideVertical = editorRect.h >= editorRect.w;
-      updateOrientBtn();
+      setOrientationFromDimensions(editorRect.w, editorRect.h);
     }
 
     function sizeCropCanvas() {
