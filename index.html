@@ -199,7 +199,7 @@
     </div>
   </div>
 
-  <div class="app-version">v13</div>
+  <div class="app-version">v14</div>
 
   <script>
     'use strict';
@@ -216,7 +216,8 @@
     const PAGE_PAD  = Math.round(mmToPx(3));       // ページ端の安全余白 3mm
     const RULER     = Math.round(cmToPx(0.24));    // 個別ルーラーの細い帯 2.4mm
     const RULER_GAP = Math.round(cmToPx(0.12));    // 画像とルーラーの間 1.2mm
-    const GAP       = Math.round(cmToPx(0.40));    // 各画像ブロック間 4mm
+    const ROW_GAP   = Math.round(cmToPx(0.40));    // 上下の画像ブロック間 4mm
+    const COL_GAP   = Math.round(cmToPx(0.70));    // 横に並べる同一画像間 7mm
     const CONTENT_W = PAGE_W - PAGE_PAD * 2;
     const CONTENT_H = PAGE_H - PAGE_PAD * 2;
     const MIN_CM    = 0.1;  // 最小サイズ 1mm
@@ -745,7 +746,7 @@
         const { w, h } = imgPx(cm, effW, effH, longEdge);
         const itemW = RULER + RULER_GAP + w;
         const itemH = RULER + RULER_GAP + h;
-        const needed = usedH + itemH + (rows.length > 0 ? GAP : 0);
+        const needed = usedH + itemH + (rows.length > 0 ? ROW_GAP : 0);
         if (needed > CONTENT_H || itemW > CONTENT_W) break;
         rows.push({ cm, w, h, itemW, itemH });
         usedH = needed;
@@ -847,18 +848,18 @@
       let curY = PAGE_PAD;
       for (let row = 0; row < rows.length; row++) {
         const { w, h, itemW, itemH } = rows[row];
-        const nCols = MAX_COLS >= 2 && itemW * 2 + GAP <= CONTENT_W ? 2 : 1;
-        const totalRowW = itemW * nCols + GAP * (nCols - 1);
+        const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
+        const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
         const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
         for (let col = 0; col < nCols; col++) {
-          const itemX = startX + col * (itemW + GAP);
+          const itemX = startX + col * (itemW + COL_GAP);
           const imageX = itemX + RULER + RULER_GAP;
           const imageY = curY + RULER + RULER_GAP;
           drawMiniRulers(ctx, imageX, imageY, w, h);
           drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
         }
         curY += itemH;
-        if (row < rows.length - 1) curY += GAP;
+        if (row < rows.length - 1) curY += ROW_GAP;
       }
 
       return canvas;
