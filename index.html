@@ -199,7 +199,7 @@
     </div>
   </div>
 
-  <div class="app-version">v12</div>
+  <div class="app-version">v13</div>
 
   <script>
     'use strict';
@@ -660,9 +660,8 @@
 
     /** 画像ごとに、上と左へ細い1mm刻みの物差しを描く。 */
     function drawMiniRulers(ctx, x, y, w, h) {
-      const emphasizedTickExtension = mmToPx(1);
-      const tickLong = RULER * 0.58 + emphasizedTickExtension;
-      const tickMedium = RULER * 0.44 + emphasizedTickExtension;
+      const tickLong = RULER * 0.58 + mmToPx(1);
+      const tickMedium = mmToPx(1.5);
       const tickShort = RULER * 0.34;
       const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
       const horizontalY = y - RULER_GAP;
