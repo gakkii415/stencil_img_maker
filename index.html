@@ -660,7 +660,9 @@
 
     /** 画像ごとに、上と左へ細い1mm刻みの物差しを描く。 */
     function drawMiniRulers(ctx, x, y, w, h) {
-      const tickLong = RULER * 0.58, tickShort = RULER * 0.34;
+      const tickLong = RULER * 0.58;
+      const tickMedium = RULER * 0.44;
+      const tickShort = RULER * 0.34;
       const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
       const horizontalY = y - RULER_GAP;
       const verticalX = x - RULER_GAP;
@@ -678,10 +680,10 @@
       ctx.beginPath(); ctx.moveTo(x, horizontalY); ctx.lineTo(x + w, horizontalY); ctx.stroke();
       for (let d = 0; d <= widthMm + 0.001; d += 1) {
         const px = x + cmToPx(d / 10);
-        const major = d % 5 === 0;
+        const tickLength = d % 10 === 0 ? tickLong : d % 5 === 0 ? tickMedium : tickShort;
         ctx.beginPath();
         ctx.moveTo(px, horizontalY);
-        ctx.lineTo(px, horizontalY - (major ? tickLong : tickShort));
+        ctx.lineTo(px, horizontalY - tickLength);
         ctx.stroke();
       }
 
@@ -689,10 +691,10 @@
       ctx.beginPath(); ctx.moveTo(verticalX, y); ctx.lineTo(verticalX, y + h); ctx.stroke();
       for (let d = 0; d <= heightMm + 0.001; d += 1) {
         const py = y + cmToPx(d / 10);
-        const major = d % 5 === 0;
+        const tickLength = d % 10 === 0 ? tickLong : d % 5 === 0 ? tickMedium : tickShort;
         ctx.beginPath();
         ctx.moveTo(verticalX, py);
-        ctx.lineTo(verticalX - (major ? tickLong : tickShort), py);
+        ctx.lineTo(verticalX - tickLength, py);
         ctx.stroke();
       }
 
