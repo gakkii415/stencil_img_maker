@@ -19,7 +19,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
       -webkit-font-smoothing: antialiased;
     }
-    button, input, summary { font: inherit; }
+    button, input, select, summary { font: inherit; }
     button, summary { -webkit-tap-highlight-color: transparent; }
     .app-header { margin-bottom: 18px; }
     h1 { margin: 0; font-size: 23px; line-height: 1.15; letter-spacing: -.025em; }
@@ -76,6 +76,14 @@
     .settings-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
     .field { display: block; min-width: 0; }
     .field-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .price-panel { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .price-panel-title { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+    .price-panel-note { margin: 0 0 14px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .price-field + .price-field { margin-top: 14px; }
+    .price-field select {
+      width: 100%; height: 48px; padding: 0 12px; border: 1px solid var(--line);
+      border-radius: 6px; background: var(--soft); color: var(--ink); font-size: 16px;
+    }
     .input-shell {
       display: flex; align-items: center; width: 100%; height: 48px;
       border: 1px solid var(--line); border-radius: 6px; background: var(--soft); overflow: hidden;
@@ -177,6 +185,41 @@
     <button id="orientBtn" type="button">
       <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
     </button>
+    <div class="price-panel">
+      <p class="price-panel-title">料金設定</p>
+      <p class="price-panel-note">以下の内容を全サイズの料金計算に使用します。長辺・短辺は各画像から自動算出します。</p>
+      <label class="field price-field" for="priceWhitespace">
+        <span class="field-label">複数モチーフの場合の余白</span>
+        <select id="priceWhitespace">
+          <option value="">---</option>
+          <option value="notApplicable">該当なし</option>
+          <option value="large">余白が非常に多い（70%以上）</option>
+          <option value="half">余白が約半分（50%前後）</option>
+          <option value="some">余白が少ない（20〜30%）</option>
+          <option value="none">余白がほとんどない（0〜10%）</option>
+        </select>
+      </label>
+      <label class="field price-field" for="priceComplexity">
+        <span class="field-label">デザインの複雑さ</span>
+        <select id="priceComplexity">
+          <option value="">---</option>
+          <option value="verySimple">非常にシンプル</option>
+          <option value="simple">シンプル</option>
+          <option value="standard">標準</option>
+          <option value="complex">複雑</option>
+          <option value="veryComplex">非常に複雑</option>
+        </select>
+      </label>
+      <label class="field price-field" for="priceColor">
+        <span class="field-label">カラー</span>
+        <select id="priceColor">
+          <option value="">---</option>
+          <option value="oneToThree">1〜3色 または ブラック&amp;グレー</option>
+          <option value="fourToSix">4〜6色</option>
+          <option value="sevenPlus">7色〜</option>
+        </select>
+      </label>
+    </div>
   </section>
 
   <p class="status" id="status">画像を選択すると自動で生成します</p>
@@ -199,7 +242,7 @@
     </div>
   </div>
 
-  <div class="app-version">v15</div>
+  <div class="app-version">v16</div>
 
   <script>
     'use strict';
@@ -222,6 +265,80 @@
     const CONTENT_H = PAGE_H - PAGE_PAD * 2;
     const MIN_CM    = 0.1;  // 最小サイズ 1mm
     const MAX_COLS  = 2;    // 横に並べる最大枚数
+
+    // price-simulator/artist.html と同じ料金テーブル・計算順。
+    const PRICE_BANDS = [
+      { size: 'XXS', min: 1, max: 9, price: 13000 },
+      { size: 'XS', min: 10, max: 44, price: 17000 },
+      { size: 'XS', min: 45, max: 49, price: 22000 },
+      { size: 'S', min: 50, max: 75, price: 25000 },
+      { size: 'S', min: 76, max: 90, price: 33000 },
+      { size: 'M', min: 91, max: 109, price: 42000 },
+      { size: 'M', min: 110, max: 150, price: 52000 },
+      { size: 'M', min: 151, max: 180, price: 62000 },
+      { size: 'L', min: 181, max: 230, price: 80000 }
+    ];
+    const PRICE_RATE = {
+      shape: {
+        veryNarrow: { XS: -20, S: -20, M: -30, L: -30 },
+        narrow: { XS: 0, S: -10, M: -15, L: -15 },
+        somewhat: { XS: 0, S: 0, M: -8, L: -8 },
+        square: { XS: 0, S: 0, M: 0, L: 0 }
+      },
+      whitespace: {
+        notApplicable: { XS: 0, S: 0, M: 0, L: 0 },
+        large: { XS: 0, S: -30, M: -30, L: -30 },
+        half: { XS: 0, S: -10, M: -15, L: -15 },
+        some: { XS: 0, S: 0, M: -10, L: -10 },
+        none: { XS: 0, S: 0, M: 0, L: 0 }
+      },
+      complexity: {
+        verySimple: { XS: 0, S: -15, M: -15, L: -20 },
+        simple: { XS: 0, S: 0, M: -10, L: -15 },
+        standard: { XS: 0, S: 0, M: 0, L: 0 },
+        complex: { XS: 0, S: 10, M: 5, L: 5 },
+        veryComplex: { XS: 10, S: 15, M: 10, L: 25 }
+      },
+      color: {
+        oneToThree: { XS: 0, S: 0, M: 0, L: 0 },
+        fourToSix: { XS: 0, S: 5, M: 5, L: 10 },
+        sevenPlus: { XS: 10, S: 10, M: 10, L: 20 }
+      }
+    };
+
+    function priceRate(type, value, size) {
+      if (size === 'XXS') return 0;
+      return PRICE_RATE[type]?.[value]?.[size] ?? 0;
+    }
+
+    function shapeFromRatio(ratio) {
+      if (ratio <= .34) return 'veryNarrow';
+      if (ratio <= .6) return 'narrow';
+      if (ratio <= .85) return 'somewhat';
+      return 'square';
+    }
+
+    function calculatePrice(longMm, shortMm) {
+      const whitespace = $id('priceWhitespace').value;
+      const complexity = $id('priceComplexity').value;
+      const color = $id('priceColor').value;
+      if (!whitespace || !complexity || !color) return null;
+      const band = PRICE_BANDS.find(item => longMm >= item.min && longMm <= item.max);
+      if (!band) return '対象外';
+      const shape = shapeFromRatio(shortMm / longMm);
+      let amount = band.price;
+      amount *= 1 + priceRate('shape', shape, band.size) / 100;
+      amount *= 1 + priceRate('whitespace', whitespace, band.size) / 100;
+      amount *= 1 + priceRate('complexity', complexity, band.size) / 100;
+      amount *= 1 + priceRate('color', color, band.size) / 100;
+      return Math.max(0, Math.round(amount / 1000) * 1000);
+    }
+
+    function formatPrice(value) {
+      if (value === null) return '';
+      if (typeof value !== 'number') return value;
+      return value.toLocaleString('ja-JP');
+    }
 
     // --- UI ---
     let longSideVertical = false;
@@ -276,6 +393,9 @@
       stepIsAutomatic = $id('stepMm').value.trim() === '';
       if (currentDataURL) scheduleGenerate();
     });
+    for (const id of ['priceWhitespace', 'priceComplexity', 'priceColor']) {
+      $id(id).addEventListener('change', () => { if (currentDataURL) scheduleGenerate(); });
+    }
 
     let currentDataURL = null, generateTimer = null, fileLoadId = 0;
     let currentWasCropped = false;
@@ -660,7 +780,7 @@
     function formatMmFromCm(value) { return formatMm(value * 10); }
 
     /** 画像ごとに、上と左へ細い1mm刻みの物差しを描く。 */
-    function drawMiniRulers(ctx, x, y, w, h) {
+    function drawMiniRulers(ctx, x, y, w, h, price) {
       const tickLong = RULER * 0.58 + mmToPx(1);
       const tickMedium = mmToPx(1.5);
       const tickShort = RULER * 0.34;
@@ -700,7 +820,8 @@
       }
 
       // 実寸値は白抜きで読みやすくし、定規の帯を太くしない。
-      const topLabel = formatMm(widthMm);
+      const priceLabel = formatPrice(price);
+      const topLabel = formatMm(widthMm) + (widthMm >= heightMm && priceLabel ? `  ${priceLabel}` : '');
       const topWidth = ctx.measureText(topLabel).width;
       const topX = x + w / 2;
       const topY = horizontalY - fontSize * 0.2;
@@ -709,7 +830,7 @@
       ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillText(topLabel, topX, topY);
 
-      const sideLabel = formatMm(heightMm);
+      const sideLabel = formatMm(heightMm) + (heightMm > widthMm && priceLabel ? `  ${priceLabel}` : '');
       const sideWidth = ctx.measureText(sideLabel).width;
       const sideX = verticalX - fontSize * 0.2;
       const sideY = y + h / 2;
@@ -855,7 +976,10 @@
           const itemX = startX + col * (itemW + COL_GAP);
           const imageX = itemX + RULER + RULER_GAP;
           const imageY = curY + RULER + RULER_GAP;
-          drawMiniRulers(ctx, imageX, imageY, w, h);
+          const longMm = cm * 10;
+          const shortMm = longMm * Math.min(effW, effH) / Math.max(effW, effH);
+          const price = calculatePrice(longMm, shortMm);
+          drawMiniRulers(ctx, imageX, imageY, w, h, price);
           drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
         }
         curY += itemH;
