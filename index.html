@@ -199,7 +199,7 @@
     </div>
   </div>
 
-  <div class="app-version">v11</div>
+  <div class="app-version">v16</div>
 
   <script>
     'use strict';
@@ -215,8 +215,9 @@
     const PAGE_H    = Math.round(mmToPx(276.87));
     const PAGE_PAD  = Math.round(mmToPx(3));       // ページ端の安全余白 3mm
     const RULER     = Math.round(cmToPx(0.24));    // 個別ルーラーの細い帯 2.4mm
-    const RULER_GAP = Math.round(cmToPx(0.06));    // 画像とルーラーの間 0.6mm
-    const GAP       = Math.round(cmToPx(0.20));    // 各画像ブロック間 2mm
+    const RULER_GAP = Math.round(cmToPx(0.12));    // 画像とルーラーの間 1.2mm
+    const ROW_GAP   = Math.round(cmToPx(0.70));    // 上下の異なるサイズ間 7mm
+    const COL_GAP   = Math.round(cmToPx(0.70));    // 横に並べる同一画像間 7mm
     const CONTENT_W = PAGE_W - PAGE_PAD * 2;
     const CONTENT_H = PAGE_H - PAGE_PAD * 2;
     const MIN_CM    = 0.1;  // 最小サイズ 1mm
@@ -653,16 +654,17 @@
     }
 
     function formatMm(value) {
-      const rounded = Math.round(value * 10) / 10;
-      return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}mm`;
+      return `${Math.round(value)}mm`;
     }
 
     function formatMmFromCm(value) { return formatMm(value * 10); }
 
     /** 画像ごとに、上と左へ細い1mm刻みの物差しを描く。 */
     function drawMiniRulers(ctx, x, y, w, h) {
-      const tickLong = RULER * 0.58, tickShort = RULER * 0.34;
-      const fontSize = Math.max(12, Math.round(cmToPx(0.18)));
+      const tickLong = RULER * 0.58 + mmToPx(1);
+      const tickMedium = mmToPx(1.5);
+      const tickShort = RULER * 0.34;
+      const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
       const horizontalY = y - RULER_GAP;
       const verticalX = x - RULER_GAP;
       const widthCm = w / cmToPx(1);
@@ -679,10 +681,10 @@
       ctx.beginPath(); ctx.moveTo(x, horizontalY); ctx.lineTo(x + w, horizontalY); ctx.stroke();
       for (let d = 0; d <= widthMm + 0.001; d += 1) {
         const px = x + cmToPx(d / 10);
-        const major = d % 5 === 0;
+        const tickLength = d % 10 === 0 ? tickLong : d % 5 === 0 ? tickMedium : tickShort;
         ctx.beginPath();
         ctx.moveTo(px, horizontalY);
-        ctx.lineTo(px, horizontalY - (major ? tickLong : tickShort));
+        ctx.lineTo(px, horizontalY - tickLength);
         ctx.stroke();
       }
 
@@ -690,10 +692,10 @@
       ctx.beginPath(); ctx.moveTo(verticalX, y); ctx.lineTo(verticalX, y + h); ctx.stroke();
       for (let d = 0; d <= heightMm + 0.001; d += 1) {
         const py = y + cmToPx(d / 10);
-        const major = d % 5 === 0;
+        const tickLength = d % 10 === 0 ? tickLong : d % 5 === 0 ? tickMedium : tickShort;
         ctx.beginPath();
         ctx.moveTo(verticalX, py);
-        ctx.lineTo(verticalX - (major ? tickLong : tickShort), py);
+        ctx.lineTo(verticalX - tickLength, py);
         ctx.stroke();
       }
 
@@ -744,7 +746,7 @@
         const { w, h } = imgPx(cm, effW, effH, longEdge);
         const itemW = RULER + RULER_GAP + w;
         const itemH = RULER + RULER_GAP + h;
-        const needed = usedH + itemH + (rows.length > 0 ? GAP : 0);
+        const needed = usedH + itemH + (rows.length > 0 ? ROW_GAP : 0);
         if (needed > CONTENT_H || itemW > CONTENT_W) break;
         rows.push({ cm, w, h, itemW, itemH });
         usedH = needed;
@@ -753,22 +755,52 @@
     }
 
     /**
-     * anchor が中央に来るよう、step 刻みで小・大を必ず対にして広げる。
+     * anchor を中心に小・大を対で広げ、対が入らなくなったら
+     * 大きい側を優先して片側ずつ追加し、ページの空きを使い切る。
      */
     function buildPageList(anchorCm, step, effW, effH, longEdge) {
       const base = resolveRows([anchorCm], effW, effH, longEdge);
       if (base.length === 0) return [anchorCm]; // 入らなくても最低1種は返す
 
       const list = [anchorCm];
+      const fitsAll = (candidate) => {
+        const sorted = [...candidate].sort((a, b) => a - b);
+        return resolveRows(sorted, effW, effH, longEdge).length === sorted.length;
+      };
       let level = 1;
       while (true) {
         const down = Math.round((anchorCm - step * level) * 100) / 100;
         const up = Math.round((anchorCm + step * level) * 100) / 100;
-        if (down < MIN_CM) break;
-        const pair = [...list, down, up].sort((a, b) => a - b);
-        if (resolveRows(pair, effW, effH, longEdge).length < pair.length) break;
-        list.push(down, up);
+        const hasDown = down >= MIN_CM;
+        const pair = hasDown ? [...list, down, up] : null;
+
+        if (pair && fitsAll(pair)) {
+          list.push(down, up);
+          level++;
+          continue;
+        }
+
+        // 対で入らない場合も、まず大きい側だけで入るか確認する。
+        let direction = 0;
+        if (fitsAll([...list, up])) {
+          list.push(up);
+          direction = 1;
+        } else if (hasDown && fitsAll([...list, down])) {
+          list.push(down);
+          direction = -1;
+        }
+
+        if (direction === 0) break;
+
+        // 選んだ側に、隣接サイズを入る限り追加する。
         level++;
+        while (true) {
+          const next = Math.round((anchorCm + direction * step * level) * 100) / 100;
+          if (next < MIN_CM || !fitsAll([...list, next])) break;
+          list.push(next);
+          level++;
+        }
+        break;
       }
 
       return list.sort((a, b) => a - b);
@@ -846,18 +878,18 @@
       let curY = PAGE_PAD;
       for (let row = 0; row < rows.length; row++) {
         const { w, h, itemW, itemH } = rows[row];
-        const nCols = MAX_COLS >= 2 && itemW * 2 + GAP <= CONTENT_W ? 2 : 1;
-        const totalRowW = itemW * nCols + GAP * (nCols - 1);
+        const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
+        const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
         const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
         for (let col = 0; col < nCols; col++) {
-          const itemX = startX + col * (itemW + GAP);
+          const itemX = startX + col * (itemW + COL_GAP);
           const imageX = itemX + RULER + RULER_GAP;
           const imageY = curY + RULER + RULER_GAP;
           drawMiniRulers(ctx, imageX, imageY, w, h);
           drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
         }
         curY += itemH;
-        if (row < rows.length - 1) curY += GAP;
+        if (row < rows.length - 1) curY += ROW_GAP;
       }
 
       return canvas;
