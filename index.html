@@ -199,7 +199,7 @@
     </div>
   </div>
 
-  <div class="app-version">v11</div>
+  <div class="app-version">v12</div>
 
   <script>
     'use strict';
@@ -215,8 +215,8 @@
     const PAGE_H    = Math.round(mmToPx(276.87));
     const PAGE_PAD  = Math.round(mmToPx(3));       // ページ端の安全余白 3mm
     const RULER     = Math.round(cmToPx(0.24));    // 個別ルーラーの細い帯 2.4mm
-    const RULER_GAP = Math.round(cmToPx(0.06));    // 画像とルーラーの間 0.6mm
-    const GAP       = Math.round(cmToPx(0.20));    // 各画像ブロック間 2mm
+    const RULER_GAP = Math.round(cmToPx(0.12));    // 画像とルーラーの間 1.2mm
+    const GAP       = Math.round(cmToPx(0.40));    // 各画像ブロック間 4mm
     const CONTENT_W = PAGE_W - PAGE_PAD * 2;
     const CONTENT_H = PAGE_H - PAGE_PAD * 2;
     const MIN_CM    = 0.1;  // 最小サイズ 1mm
@@ -653,8 +653,7 @@
     }
 
     function formatMm(value) {
-      const rounded = Math.round(value * 10) / 10;
-      return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}mm`;
+      return `${Math.round(value)}mm`;
     }
 
     function formatMmFromCm(value) { return formatMm(value * 10); }
@@ -662,7 +661,7 @@
     /** 画像ごとに、上と左へ細い1mm刻みの物差しを描く。 */
     function drawMiniRulers(ctx, x, y, w, h) {
       const tickLong = RULER * 0.58, tickShort = RULER * 0.34;
-      const fontSize = Math.max(12, Math.round(cmToPx(0.18)));
+      const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
       const horizontalY = y - RULER_GAP;
       const verticalX = x - RULER_GAP;
       const widthCm = w / cmToPx(1);
