@@ -496,7 +496,7 @@
 
     function scheduleExportPreparation(revision) {
       clearTimeout(exportTimer);
-      exportTimer = setTimeout(() => prepareExports(revision), 800);
+      exportTimer = setTimeout(() => prepareExports(revision), 1500);
     }
 
     async function prepareExports(revision) {
