@@ -45,16 +45,19 @@
       border: 0; background: #fff;
     }
     .crop-section summary {
-      position: relative; width: 100%; min-height: 46px; padding: 13px 38px 13px 0;
-      cursor: pointer; list-style: none; color: var(--ink); font-size: 14px; font-weight: 700;
+      position: relative; display: flex; align-items: center; width: 100%; min-height: 44px;
+      padding: 10px 42px 10px 14px; cursor: pointer; list-style: none;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff;
+      color: var(--ink); font-size: 13px; font-weight: 700;
     }
     .crop-section summary::-webkit-details-marker { display: none; }
     .crop-section summary::after {
-      content: "▼"; position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      content: "▼"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
       color: var(--muted); font-size: 10px; transition: transform .18s;
     }
+    .crop-section summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .crop-section[open] summary::after { transform: translateY(-50%) rotate(180deg); }
-    .crop-content { padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    .crop-content { padding: 10px 0 4px; }
     .crop-stage {
       width: 100%; min-height: 210px; max-height: 60dvh; padding: 0;
       display: flex; align-items: center; justify-content: center;
@@ -73,15 +76,21 @@
       border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fff;
     }
     .panel-title { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-    .settings-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .field { display: block; min-width: 0; }
     .field-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
-    .price-panel { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-    .price-panel-title { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-    .price-panel-note { margin: 0 0 14px; color: var(--muted); font-size: 11px; line-height: 1.5; }
-    .price-field + .price-field { margin-top: 14px; }
+    .price-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .price-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .price-panel-title { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+    .price-panel-note { margin: 0; color: var(--muted); font-size: 10px; }
+    .price-field {
+      display: grid; grid-template-columns: 72px minmax(0, 1fr);
+      align-items: center; gap: 10px; min-width: 0;
+    }
+    .price-field + .price-field { margin-top: 8px; }
+    .price-field .field-label { margin: 0; }
     .price-field select {
-      width: 100%; height: 48px; padding: 0 12px; border: 1px solid var(--line);
+      min-width: 0; width: 100%; height: 44px; padding: 0 10px; border: 1px solid var(--line);
       border-radius: 6px; background: var(--soft); color: var(--ink); font-size: 16px;
     }
     .input-shell {
@@ -186,10 +195,12 @@
       <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
     </button>
     <div class="price-panel">
-      <p class="price-panel-title">料金設定</p>
-      <p class="price-panel-note">以下の内容を全サイズの料金計算に使用します。長辺・短辺は各画像から自動算出します。</p>
+      <div class="price-panel-head">
+        <p class="price-panel-title">料金設定</p>
+        <p class="price-panel-note">全サイズ共通</p>
+      </div>
       <label class="field price-field" for="priceWhitespace">
-        <span class="field-label">複数モチーフの場合の余白</span>
+        <span class="field-label">余白</span>
         <select id="priceWhitespace">
           <option value="">---</option>
           <option value="notApplicable">該当なし</option>
@@ -200,7 +211,7 @@
         </select>
       </label>
       <label class="field price-field" for="priceComplexity">
-        <span class="field-label">デザインの複雑さ</span>
+        <span class="field-label">複雑さ</span>
         <select id="priceComplexity">
           <option value="">---</option>
           <option value="verySimple">非常にシンプル</option>
@@ -242,7 +253,7 @@
     </div>
   </div>
 
-  <div class="app-version">v17</div>
+  <div class="app-version">v18</div>
 
   <script>
     'use strict';
