@@ -19,7 +19,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
       -webkit-font-smoothing: antialiased;
     }
-    button, input, summary { font: inherit; }
+    button, input, select, summary { font: inherit; }
     button, summary { -webkit-tap-highlight-color: transparent; }
     .app-header { margin-bottom: 18px; }
     h1 { margin: 0; font-size: 23px; line-height: 1.15; letter-spacing: -.025em; }
@@ -45,19 +45,19 @@
       border: 0; background: #fff;
     }
     .crop-section summary {
-      display: flex; align-items: center; position: relative; width: 100%; min-height: 44px;
-      padding: 10px 52px 10px 12px; cursor: pointer; list-style: none;
+      position: relative; display: flex; align-items: center; width: 100%; min-height: 44px;
+      padding: 10px 42px 10px 14px; cursor: pointer; list-style: none;
       border: 1px solid var(--line); border-radius: 6px; background: #fff;
       color: var(--ink); font-size: 13px; font-weight: 700;
     }
     .crop-section summary::-webkit-details-marker { display: none; }
     .crop-section summary::after {
-      content: "開く"; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-      color: var(--accent); font-size: 11px; font-weight: 600;
+      content: "▼"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 10px; transition: transform .18s;
     }
-    .crop-section[open] summary { border-color: var(--accent); background: var(--accent-soft); }
-    .crop-section[open] summary::after { content: "閉じる"; }
-    .crop-content { padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    .crop-section summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .crop-section[open] summary::after { transform: translateY(-50%) rotate(180deg); }
+    .crop-content { padding: 10px 0 4px; }
     .crop-stage {
       width: 100%; min-height: 210px; max-height: 60dvh; padding: 0;
       display: flex; align-items: center; justify-content: center;
@@ -76,11 +76,24 @@
       border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fff;
     }
     .panel-title { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-    .settings-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .field { display: block; min-width: 0; }
     .field-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .price-panel { margin: 0; }
+    .output-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .price-field {
+      display: grid; grid-template-columns: 72px minmax(0, 1fr);
+      align-items: center; gap: 10px; min-width: 0;
+    }
+    .price-field + .price-field { margin-top: 8px; }
+    .price-field .field-label { margin: 0; }
+    .price-field select {
+      min-width: 0; width: 100%; height: 44px; padding: 0 10px; border: 1px solid var(--line);
+      border-radius: 6px; background: var(--soft); color: var(--ink); font-size: 16px;
+    }
+    .number-row { display: flex; align-items: center; gap: 8px; width: 100%; }
     .input-shell {
-      display: flex; align-items: center; width: 100%; height: 48px;
+      display: flex; align-items: center; flex: 1; min-width: 0; height: 48px;
       border: 1px solid var(--line); border-radius: 6px; background: var(--soft); overflow: hidden;
     }
     .input-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: #fff; }
@@ -89,7 +102,7 @@
       border: 0; outline: 0; background: transparent; color: var(--ink);
       font-size: 21px; font-weight: 700; text-align: right;
     }
-    .input-shell .unit { padding-right: 12px; color: var(--muted); font-size: 13px; font-weight: 600; }
+    .number-row > .unit { flex: 0 0 auto; color: var(--muted); font-size: 13px; font-weight: 600; }
     #orientBtn {
       display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px;
       margin-top: 14px; padding: 10px 12px; cursor: pointer;
@@ -117,7 +130,7 @@
     .badge-small { background: #e8f7fa; color: #0e7490; border: 1px solid #bde8ef; }
     .badge-large { background: #fff2e2; color: #b54708; border: 1px solid #f4d3ac; }
     .output-card .card-title span:last-child { min-width: 0; overflow-wrap: anywhere; }
-    .output-card img { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
+    .output-card canvas { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
     .photo-save {
       width: 100%; min-height: 44px; margin-top: 10px; padding: 10px 16px; cursor: pointer;
       border: 0; border-radius: 6px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700;
@@ -160,26 +173,64 @@
   </details>
 
   <section class="tool-panel">
-    <p class="panel-title">出力設定</p>
-    <div class="settings-grid">
-      <label class="field" for="baseMm">
-        <span class="field-label">長辺</span>
-        <span class="input-shell">
-          <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
-          <span class="unit">mm</span>
-        </span>
+    <div class="price-panel">
+      <label class="field price-field" for="priceWhitespace">
+        <span class="field-label">余白</span>
+        <select id="priceWhitespace">
+          <option value="">---</option>
+          <option value="notApplicable">該当なし</option>
+          <option value="large">余白が非常に多い（70%以上）</option>
+          <option value="half">余白が約半分（50%前後）</option>
+          <option value="some">余白が少ない（20〜30%）</option>
+          <option value="none">余白がほとんどない（0〜10%）</option>
+        </select>
       </label>
-      <label class="field" for="stepMm">
-        <span class="field-label">刻み幅</span>
-        <span class="input-shell">
-          <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
-          <span class="unit">mm</span>
-        </span>
+      <label class="field price-field" for="priceComplexity">
+        <span class="field-label">複雑さ</span>
+        <select id="priceComplexity">
+          <option value="">---</option>
+          <option value="verySimple">非常にシンプル</option>
+          <option value="simple">シンプル</option>
+          <option value="standard">標準</option>
+          <option value="complex">複雑</option>
+          <option value="veryComplex">非常に複雑</option>
+        </select>
+      </label>
+      <label class="field price-field" for="priceColor">
+        <span class="field-label">カラー</span>
+        <select id="priceColor">
+          <option value="">---</option>
+          <option value="oneToThree">1〜3色 または ブラック&amp;グレー</option>
+          <option value="fourToSix">4〜6色</option>
+          <option value="sevenPlus">7色〜</option>
+        </select>
       </label>
     </div>
-    <button id="orientBtn" type="button">
-      <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
-    </button>
+    <div class="output-panel">
+      <div class="settings-grid">
+        <label class="field" for="baseMm">
+          <span class="field-label">長辺</span>
+          <span class="number-row">
+            <span class="input-shell">
+              <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
+            </span>
+            <span class="unit">mm</span>
+          </span>
+        </label>
+        <label class="field" for="stepMm">
+          <span class="field-label">刻み幅</span>
+          <span class="number-row">
+            <span class="input-shell">
+              <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
+            </span>
+            <span class="unit">mm</span>
+          </span>
+        </label>
+      </div>
+      <button id="orientBtn" type="button">
+        <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
+      </button>
+    </div>
   </section>
 
   <p class="status" id="status">画像を選択すると自動で生成します</p>
@@ -187,22 +238,22 @@
   <div class="output-section" id="outputSection">
     <div class="output-card" id="card-main">
       <div class="card-title"><span class="badge badge-main">メイン</span><span id="label-main"></span></div>
-      <img id="img-main" alt="main" />
+      <canvas id="img-main" role="img" aria-label="メインのプレビュー"></canvas>
       <button class="photo-save" id="save-main" type="button">写真に保存</button>
     </div>
     <div class="output-card" id="card-small">
       <div class="card-title"><span class="badge badge-small">小さいバージョン</span><span id="label-small"></span></div>
-      <img id="img-small" alt="small" />
+      <canvas id="img-small" role="img" aria-label="小さいバージョンのプレビュー"></canvas>
       <button class="photo-save" id="save-small" type="button">写真に保存</button>
     </div>
     <div class="output-card" id="card-large">
       <div class="card-title"><span class="badge badge-large">大きいバージョン</span><span id="label-large"></span></div>
-      <img id="img-large" alt="large" />
+      <canvas id="img-large" role="img" aria-label="大きいバージョンのプレビュー"></canvas>
       <button class="photo-save" id="save-large" type="button">写真に保存</button>
     </div>
   </div>
 
-  <div class="app-version">v17</div>
+  <div class="app-version">v23</div>
 
   <script>
     'use strict';
@@ -225,6 +276,81 @@
     const CONTENT_H = PAGE_H - PAGE_PAD * 2;
     const MIN_CM    = 0.1;  // 最小サイズ 1mm
     const MAX_COLS  = 2;    // 横に並べる最大枚数
+    const PREVIEW_SCALE = 0.34; // 画面表示は軽量化し、保存画像だけ300dpiにする
+
+    // price-simulator/artist.html と同じ料金テーブル・計算順。
+    const PRICE_BANDS = [
+      { size: 'XXS', min: 1, max: 9, price: 13000 },
+      { size: 'XS', min: 10, max: 44, price: 17000 },
+      { size: 'XS', min: 45, max: 49, price: 22000 },
+      { size: 'S', min: 50, max: 75, price: 25000 },
+      { size: 'S', min: 76, max: 90, price: 33000 },
+      { size: 'M', min: 91, max: 109, price: 42000 },
+      { size: 'M', min: 110, max: 150, price: 52000 },
+      { size: 'M', min: 151, max: 180, price: 62000 },
+      { size: 'L', min: 181, max: 230, price: 80000 }
+    ];
+    const PRICE_RATE = {
+      shape: {
+        veryNarrow: { XS: -20, S: -20, M: -30, L: -30 },
+        narrow: { XS: 0, S: -10, M: -15, L: -15 },
+        somewhat: { XS: 0, S: 0, M: -8, L: -8 },
+        square: { XS: 0, S: 0, M: 0, L: 0 }
+      },
+      whitespace: {
+        notApplicable: { XS: 0, S: 0, M: 0, L: 0 },
+        large: { XS: 0, S: -30, M: -30, L: -30 },
+        half: { XS: 0, S: -10, M: -15, L: -15 },
+        some: { XS: 0, S: 0, M: -10, L: -10 },
+        none: { XS: 0, S: 0, M: 0, L: 0 }
+      },
+      complexity: {
+        verySimple: { XS: 0, S: -15, M: -15, L: -20 },
+        simple: { XS: 0, S: 0, M: -10, L: -15 },
+        standard: { XS: 0, S: 0, M: 0, L: 0 },
+        complex: { XS: 0, S: 10, M: 5, L: 5 },
+        veryComplex: { XS: 10, S: 15, M: 10, L: 25 }
+      },
+      color: {
+        oneToThree: { XS: 0, S: 0, M: 0, L: 0 },
+        fourToSix: { XS: 0, S: 5, M: 5, L: 10 },
+        sevenPlus: { XS: 10, S: 10, M: 10, L: 20 }
+      }
+    };
+
+    function priceRate(type, value, size) {
+      if (size === 'XXS') return 0;
+      return PRICE_RATE[type]?.[value]?.[size] ?? 0;
+    }
+
+    function shapeFromRatio(ratio) {
+      if (ratio <= .34) return 'veryNarrow';
+      if (ratio <= .6) return 'narrow';
+      if (ratio <= .85) return 'somewhat';
+      return 'square';
+    }
+
+    function calculatePrice(longMm, shortMm) {
+      const whitespace = $id('priceWhitespace').value;
+      const complexity = $id('priceComplexity').value;
+      const color = $id('priceColor').value;
+      if (!whitespace || !complexity || !color) return null;
+      const band = PRICE_BANDS.find(item => longMm >= item.min && longMm <= item.max);
+      if (!band) return '対象外';
+      const shape = shapeFromRatio(shortMm / longMm);
+      let amount = band.price;
+      amount *= 1 + priceRate('shape', shape, band.size) / 100;
+      amount *= 1 + priceRate('whitespace', whitespace, band.size) / 100;
+      amount *= 1 + priceRate('complexity', complexity, band.size) / 100;
+      amount *= 1 + priceRate('color', color, band.size) / 100;
+      return Math.max(0, Math.round(amount / 1000) * 1000);
+    }
+
+    function formatPrice(value) {
+      if (value === null) return '';
+      if (typeof value !== 'number') return value;
+      return `¥${value.toLocaleString('ja-JP')}`;
+    }
 
     // --- UI ---
     let longSideVertical = false;
@@ -273,18 +399,37 @@
       fileInput.value = ''; // 同じ画像を続けて選び直してもchangeを発生させる
       if (f) handleFile(f);
     });
-    $id('baseMm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
-    let stepIsAutomatic = true;
-    $id('stepMm').addEventListener('input', () => {
-      stepIsAutomatic = $id('stepMm').value.trim() === '';
-      if (currentDataURL) scheduleGenerate();
-    });
+    function selectNumberOnTap(input) {
+      input.addEventListener('focus', () => {
+        requestAnimationFrame(() => input.select());
+      });
+      input.addEventListener('pointerup', (event) => {
+        event.preventDefault();
+        input.select();
+      });
+    }
 
-    let currentDataURL = null, generateTimer = null, fileLoadId = 0;
+    const baseMmInput = $id('baseMm');
+    const stepMmInput = $id('stepMm');
+    selectNumberOnTap(baseMmInput);
+    selectNumberOnTap(stepMmInput);
+
+    baseMmInput.addEventListener('input', () => { if (currentDataURL) scheduleGenerate(160); });
+    let stepIsAutomatic = true;
+    stepMmInput.addEventListener('input', () => {
+      stepIsAutomatic = stepMmInput.value.trim() === '';
+      if (currentDataURL) scheduleGenerate(160);
+    });
+    for (const id of ['priceWhitespace', 'priceComplexity', 'priceColor']) {
+      $id(id).addEventListener('change', () => { if (currentDataURL) scheduleGenerate(0); });
+    }
+
+    let currentDataURL = null, generateTimer = null, exportTimer = null, fileLoadId = 0, renderRevision = 0;
     let currentWasCropped = false;
     let originalDataURL = null, currentCropRect = null, autoCropRect = null;
     const renderedFiles = { main: null, small: null, large: null };
     const renderedUrls = { main: null, small: null, large: null };
+    const exportSpecs = { main: null, small: null, large: null };
 
     for (const key of ['main', 'small', 'large']) {
       $id(`save-${key}`).addEventListener('click', () => saveToPhotos(key));
@@ -347,9 +492,48 @@
       reader.readAsDataURL(file);
     }
 
-    function scheduleGenerate() {
+    function scheduleGenerate(delay = 120) {
       clearTimeout(generateTimer);
-      generateTimer = setTimeout(generate, 300);
+      clearTimeout(exportTimer);
+      renderRevision++;
+      for (const key of ['main', 'small', 'large']) {
+        renderedFiles[key] = null;
+        const button = $id(`save-${key}`);
+        button.disabled = true;
+        if ($id(`card-${key}`).style.display !== 'none') button.textContent = '更新中…';
+      }
+      generateTimer = setTimeout(generate, delay);
+    }
+
+    function canvasToBlob(canvas) {
+      return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    }
+
+    function scheduleExportPreparation(revision) {
+      clearTimeout(exportTimer);
+      exportTimer = setTimeout(() => prepareExports(revision), 1500);
+    }
+
+    async function prepareExports(revision) {
+      for (const key of ['main', 'small', 'large']) {
+        if (revision !== renderRevision) return;
+        const spec = exportSpecs[key];
+        if (!spec) continue;
+        const canvas = buildCanvas(
+          spec.img, spec.effW, spec.effH, spec.longEdge, spec.rotate, spec.sizes, 1
+        );
+        const blob = await canvasToBlob(canvas);
+        if (!blob || revision !== renderRevision) return;
+        if (renderedUrls[key] && renderedUrls[key].startsWith('blob:')) {
+          URL.revokeObjectURL(renderedUrls[key]);
+        }
+        renderedUrls[key] = URL.createObjectURL(blob);
+        renderedFiles[key] = new File([blob], `stencil_${key}.png`, { type: 'image/png' });
+        const button = $id(`save-${key}`);
+        button.disabled = false;
+        button.textContent = '写真に保存';
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
     }
 
     function showStatus(msg, isError = false) {
@@ -758,8 +942,7 @@
     }
 
     /**
-     * anchor を中心に小・大を対で広げ、対が入らなくなったら
-     * 大きい側を優先して片側ずつ追加し、ページの空きを使い切る。
+     * anchor が中央に来るよう、step 刻みで小・大を必ず対にして広げる。
      */
     function buildPageList(anchorCm, step, effW, effH, longEdge) {
       const base = resolveRows([anchorCm], effW, effH, longEdge);
@@ -863,11 +1046,12 @@
      * cmList からキャンバスを生成して返す。
      * resolveRows() で実際に入る行だけを描画するので絶対に重ならない。
      */
-    function buildCanvas(img, effW, effH, longEdge, rotate, cmList) {
+    function buildCanvas(img, effW, effH, longEdge, rotate, cmList, scale = 1) {
       const canvas = document.createElement('canvas');
-      canvas.width  = PAGE_W;
-      canvas.height = PAGE_H;
+      canvas.width  = Math.max(1, Math.round(PAGE_W * scale));
+      canvas.height = Math.max(1, Math.round(PAGE_H * scale));
       const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.scale(scale, scale);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, PAGE_W, PAGE_H);
       ctx.imageSmoothingEnabled = true;
@@ -880,7 +1064,7 @@
       // 各行：入る枚数を自動計算し、行ごとに独立して中央配置する。
       let curY = PAGE_PAD;
       for (let row = 0; row < rows.length; row++) {
-        const { w, h, itemW, itemH } = rows[row];
+        const { cm, w, h, itemW, itemH } = rows[row];
         const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
         const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
         const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
@@ -888,8 +1072,9 @@
           const itemX = startX + col * (itemW + COL_GAP);
           const imageX = itemX + RULER + RULER_GAP;
           const imageY = curY + RULER + RULER_GAP;
-          drawMiniRulers(ctx, imageX, imageY, w, h);
+          // 画像を先に描き、寸法数字を最後に重ねて小型デザインでも隠れないようにする。
           drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
+          drawMiniRulers(ctx, imageX, imageY, w, h);
         }
         curY += itemH;
         if (row < rows.length - 1) curY += ROW_GAP;
@@ -898,11 +1083,57 @@
       return canvas;
     }
 
+    /** 画面プレビューにだけ、各サイズ行の右側へ料金を1つ表示する。 */
+    function drawScreenPrices(ctx, effW, effH, longEdge, cmList) {
+      const rows = resolveRows(cmList, effW, effH, longEdge);
+      const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
+      let curY = PAGE_PAD;
+      ctx.save();
+      ctx.font = `500 ${fontSize}px sans-serif`;
+      ctx.textBaseline = 'top';
+
+      for (const { cm, w, h, itemW, itemH } of rows) {
+        const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
+        const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
+        const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
+        const lastItemX = startX + (nCols - 1) * (itemW + COL_GAP);
+        const imageX = lastItemX + RULER + RULER_GAP;
+        const imageY = curY + RULER + RULER_GAP;
+        const longMm = cm * 10;
+        const shortMm = longMm * Math.min(effW, effH) / Math.max(effW, effH);
+        const priceLabel = formatPrice(calculatePrice(longMm, shortMm));
+
+        if (priceLabel) {
+          const textWidth = ctx.measureText(priceLabel).width;
+          const pageRight = PAGE_W - PAGE_PAD;
+          const textX = Math.min(imageX + w + mmToPx(3) + fontSize / 2, pageRight - fontSize / 2);
+          const textY = Math.max(
+            PAGE_PAD + textWidth / 2,
+            Math.min(imageY + h / 2, PAGE_H - PAGE_PAD - textWidth / 2)
+          );
+          ctx.save();
+          ctx.translate(textX, textY);
+          ctx.rotate(Math.PI / 2);
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = 'rgba(255,255,255,.94)';
+          ctx.fillRect(-textWidth / 2 - 6, -fontSize / 2 - 4, textWidth + 12, fontSize + 8);
+          ctx.fillStyle = '#111827';
+          ctx.fillText(priceLabel, 0, 0);
+          ctx.restore();
+        }
+
+        curY += itemH + ROW_GAP;
+      }
+      ctx.restore();
+    }
+
     // =====================================================
     // メイン生成処理
     // =====================================================
     async function generate() {
       if (!currentDataURL) return;
+      const revision = ++renderRevision;
 
       const baseMm = parseFloat($id('baseMm').value);
       const baseCm = baseMm / 10;
@@ -955,29 +1186,41 @@
         const largeCms    = largeList.length > 0 ? largeList : null;
 
         // --- 描画 ---
-        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms);
-        const smallCanvas = smallCms ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms) : null;
-        const largeCanvas = largeCms ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms) : null;
+        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms, PREVIEW_SCALE);
+        const smallCanvas = smallCms
+          ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms, PREVIEW_SCALE)
+          : null;
+        const largeCanvas = largeCms
+          ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms, PREVIEW_SCALE)
+          : null;
 
         // --- UI反映 ---
-        function setCard(key, imgEl, saveBtn, labelEl, canvas, sizes) {
-          const card = imgEl.closest('.output-card');
+        function setCard(key, previewCanvas, saveBtn, labelEl, canvas, sizes) {
+          const card = previewCanvas.closest('.output-card');
           if (canvas && sizes && sizes.length > 0) {
-            const url = canvas.toDataURL('image/png');
-            imgEl.src = url;
-            renderedUrls[key] = url;
             renderedFiles[key] = null;
+            exportSpecs[key] = { img, effW, effH, longEdge, rotate, sizes: [...sizes] };
             saveBtn.disabled = true;
-            canvas.toBlob((blob) => {
-              if (!blob) return;
-              renderedFiles[key] = new File([blob], `stencil_${key}.png`, { type: 'image/png' });
-              saveBtn.disabled = false;
-            }, 'image/png');
+            saveBtn.textContent = '保存準備中…';
             card.style.display = 'block';
             labelEl.textContent = `長辺：${sizes.map(formatMmFromCm).join(' / ')}`;
+
+            // 低解像度プレビューを直接表示し、料金は画面用Canvasだけに描く。
+            previewCanvas.width = canvas.width;
+            previewCanvas.height = canvas.height;
+            const previewCtx = previewCanvas.getContext('2d', { alpha: false });
+            previewCtx.drawImage(canvas, 0, 0);
+            previewCtx.save();
+            previewCtx.scale(PREVIEW_SCALE, PREVIEW_SCALE);
+            drawScreenPrices(previewCtx, effW, effH, longEdge, sizes);
+            previewCtx.restore();
           } else {
             card.style.display = 'none';
             renderedFiles[key] = null;
+            exportSpecs[key] = null;
+            if (renderedUrls[key] && renderedUrls[key].startsWith('blob:')) {
+              URL.revokeObjectURL(renderedUrls[key]);
+            }
             renderedUrls[key] = null;
           }
         }
@@ -985,6 +1228,7 @@
         setCard('main',  $id('img-main'),  $id('save-main'),  $id('label-main'),  mainCanvas,  mainCms);
         setCard('small', $id('img-small'), $id('save-small'), $id('label-small'), smallCanvas, smallCms);
         setCard('large', $id('img-large'), $id('save-large'), $id('label-large'), largeCanvas, largeCms);
+        scheduleExportPreparation(revision);
 
         $id('outputSection').style.display = 'flex';
         showStatus('');
