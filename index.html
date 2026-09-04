@@ -79,7 +79,8 @@
     .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .field { display: block; min-width: 0; }
     .field-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
-    .price-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .price-panel { margin: 0; }
+    .output-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
     .price-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
     .price-panel-title { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
     .price-panel-note { margin: 0; color: var(--muted); font-size: 10px; }
@@ -174,26 +175,6 @@
   </details>
 
   <section class="tool-panel">
-    <p class="panel-title">出力設定</p>
-    <div class="settings-grid">
-      <label class="field" for="baseMm">
-        <span class="field-label">長辺</span>
-        <span class="input-shell">
-          <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
-          <span class="unit">mm</span>
-        </span>
-      </label>
-      <label class="field" for="stepMm">
-        <span class="field-label">刻み幅</span>
-        <span class="input-shell">
-          <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
-          <span class="unit">mm</span>
-        </span>
-      </label>
-    </div>
-    <button id="orientBtn" type="button">
-      <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
-    </button>
     <div class="price-panel">
       <div class="price-panel-head">
         <p class="price-panel-title">料金設定</p>
@@ -231,6 +212,28 @@
         </select>
       </label>
     </div>
+    <div class="output-panel">
+      <p class="panel-title">出力設定</p>
+      <div class="settings-grid">
+        <label class="field" for="baseMm">
+          <span class="field-label">長辺</span>
+          <span class="input-shell">
+            <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
+            <span class="unit">mm</span>
+          </span>
+        </label>
+        <label class="field" for="stepMm">
+          <span class="field-label">刻み幅</span>
+          <span class="input-shell">
+            <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
+            <span class="unit">mm</span>
+          </span>
+        </label>
+      </div>
+      <button id="orientBtn" type="button">
+        <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
+      </button>
+    </div>
   </section>
 
   <p class="status" id="status">画像を選択すると自動で生成します</p>
@@ -253,7 +256,7 @@
     </div>
   </div>
 
-  <div class="app-version">v19</div>
+  <div class="app-version">v20</div>
 
   <script>
     'use strict';
