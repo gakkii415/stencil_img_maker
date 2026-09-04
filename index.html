@@ -91,8 +91,9 @@
       min-width: 0; width: 100%; height: 44px; padding: 0 10px; border: 1px solid var(--line);
       border-radius: 6px; background: var(--soft); color: var(--ink); font-size: 16px;
     }
+    .number-row { display: flex; align-items: center; gap: 8px; width: 100%; }
     .input-shell {
-      display: flex; align-items: center; width: 100%; height: 48px;
+      display: flex; align-items: center; flex: 1; min-width: 0; height: 48px;
       border: 1px solid var(--line); border-radius: 6px; background: var(--soft); overflow: hidden;
     }
     .input-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: #fff; }
@@ -101,7 +102,7 @@
       border: 0; outline: 0; background: transparent; color: var(--ink);
       font-size: 21px; font-weight: 700; text-align: right;
     }
-    .input-shell .unit { padding-right: 12px; color: var(--muted); font-size: 13px; font-weight: 600; }
+    .number-row > .unit { flex: 0 0 auto; color: var(--muted); font-size: 13px; font-weight: 600; }
     #orientBtn {
       display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px;
       margin-top: 14px; padding: 10px 12px; cursor: pointer;
@@ -209,15 +210,19 @@
       <div class="settings-grid">
         <label class="field" for="baseMm">
           <span class="field-label">長辺</span>
-          <span class="input-shell">
-            <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
+          <span class="number-row">
+            <span class="input-shell">
+              <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
+            </span>
             <span class="unit">mm</span>
           </span>
         </label>
         <label class="field" for="stepMm">
           <span class="field-label">刻み幅</span>
-          <span class="input-shell">
-            <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
+          <span class="number-row">
+            <span class="input-shell">
+              <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
+            </span>
             <span class="unit">mm</span>
           </span>
         </label>
@@ -248,7 +253,7 @@
     </div>
   </div>
 
-  <div class="app-version">v21</div>
+  <div class="app-version">v22</div>
 
   <script>
     'use strict';
@@ -271,6 +276,7 @@
     const CONTENT_H = PAGE_H - PAGE_PAD * 2;
     const MIN_CM    = 0.1;  // 最小サイズ 1mm
     const MAX_COLS  = 2;    // 横に並べる最大枚数
+    const PREVIEW_SCALE = 0.34; // 画面表示は軽量化し、保存画像だけ300dpiにする
 
     // price-simulator/artist.html と同じ料金テーブル・計算順。
     const PRICE_BANDS = [
@@ -403,11 +409,12 @@
       $id(id).addEventListener('change', () => { if (currentDataURL) scheduleGenerate(0); });
     }
 
-    let currentDataURL = null, generateTimer = null, fileLoadId = 0, renderRevision = 0;
+    let currentDataURL = null, generateTimer = null, exportTimer = null, fileLoadId = 0, renderRevision = 0;
     let currentWasCropped = false;
     let originalDataURL = null, currentCropRect = null, autoCropRect = null;
     const renderedFiles = { main: null, small: null, large: null };
     const renderedUrls = { main: null, small: null, large: null };
+    const exportSpecs = { main: null, small: null, large: null };
 
     for (const key of ['main', 'small', 'large']) {
       $id(`save-${key}`).addEventListener('click', () => saveToPhotos(key));
@@ -470,9 +477,48 @@
       reader.readAsDataURL(file);
     }
 
-    function scheduleGenerate(delay = 160) {
+    function scheduleGenerate(delay = 120) {
       clearTimeout(generateTimer);
+      clearTimeout(exportTimer);
+      renderRevision++;
+      for (const key of ['main', 'small', 'large']) {
+        renderedFiles[key] = null;
+        const button = $id(`save-${key}`);
+        button.disabled = true;
+        if ($id(`card-${key}`).style.display !== 'none') button.textContent = '更新中…';
+      }
       generateTimer = setTimeout(generate, delay);
+    }
+
+    function canvasToBlob(canvas) {
+      return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    }
+
+    function scheduleExportPreparation(revision) {
+      clearTimeout(exportTimer);
+      exportTimer = setTimeout(() => prepareExports(revision), 800);
+    }
+
+    async function prepareExports(revision) {
+      for (const key of ['main', 'small', 'large']) {
+        if (revision !== renderRevision) return;
+        const spec = exportSpecs[key];
+        if (!spec) continue;
+        const canvas = buildCanvas(
+          spec.img, spec.effW, spec.effH, spec.longEdge, spec.rotate, spec.sizes, 1
+        );
+        const blob = await canvasToBlob(canvas);
+        if (!blob || revision !== renderRevision) return;
+        if (renderedUrls[key] && renderedUrls[key].startsWith('blob:')) {
+          URL.revokeObjectURL(renderedUrls[key]);
+        }
+        renderedUrls[key] = URL.createObjectURL(blob);
+        renderedFiles[key] = new File([blob], `stencil_${key}.png`, { type: 'image/png' });
+        const button = $id(`save-${key}`);
+        button.disabled = false;
+        button.textContent = '写真に保存';
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
     }
 
     function showStatus(msg, isError = false) {
@@ -956,11 +1002,12 @@
      * cmList からキャンバスを生成して返す。
      * resolveRows() で実際に入る行だけを描画するので絶対に重ならない。
      */
-    function buildCanvas(img, effW, effH, longEdge, rotate, cmList) {
+    function buildCanvas(img, effW, effH, longEdge, rotate, cmList, scale = 1) {
       const canvas = document.createElement('canvas');
-      canvas.width  = PAGE_W;
-      canvas.height = PAGE_H;
+      canvas.width  = Math.max(1, Math.round(PAGE_W * scale));
+      canvas.height = Math.max(1, Math.round(PAGE_H * scale));
       const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.scale(scale, scale);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, PAGE_W, PAGE_H);
       ctx.imageSmoothingEnabled = true;
@@ -981,8 +1028,9 @@
           const itemX = startX + col * (itemW + COL_GAP);
           const imageX = itemX + RULER + RULER_GAP;
           const imageY = curY + RULER + RULER_GAP;
-          drawMiniRulers(ctx, imageX, imageY, w, h);
+          // 画像を先に描き、寸法数字を最後に重ねて小型デザインでも隠れないようにする。
           drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
+          drawMiniRulers(ctx, imageX, imageY, w, h);
         }
         curY += itemH;
         if (row < rows.length - 1) curY += ROW_GAP;
@@ -991,37 +1039,43 @@
       return canvas;
     }
 
-    /** 画面プレビューにだけ、各画像の上辺へ料金を重ねる。 */
+    /** 画面プレビューにだけ、各サイズ行の右側へ料金を1つ表示する。 */
     function drawScreenPrices(ctx, effW, effH, longEdge, cmList) {
       const rows = resolveRows(cmList, effW, effH, longEdge);
       const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
       let curY = PAGE_PAD;
       ctx.save();
       ctx.font = `700 ${fontSize}px sans-serif`;
-      ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
 
       for (const { cm, w, h, itemW, itemH } of rows) {
         const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
         const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
         const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
+        const lastItemX = startX + (nCols - 1) * (itemW + COL_GAP);
+        const imageX = lastItemX + RULER + RULER_GAP;
+        const imageY = curY + RULER + RULER_GAP;
         const longMm = cm * 10;
         const shortMm = longMm * Math.min(effW, effH) / Math.max(effW, effH);
         const priceLabel = formatPrice(calculatePrice(longMm, shortMm));
 
         if (priceLabel) {
-          for (let col = 0; col < nCols; col++) {
-            const itemX = startX + col * (itemW + COL_GAP);
-            const imageX = itemX + RULER + RULER_GAP;
-            const imageY = curY + RULER + RULER_GAP;
-            const textX = imageX + w - mmToPx(0.8);
-            const textY = imageY + mmToPx(0.8);
-            const textWidth = ctx.measureText(priceLabel).width;
-            ctx.fillStyle = 'rgba(255,255,255,.92)';
-            ctx.fillRect(textX - textWidth - 6, textY - 4, textWidth + 12, fontSize + 8);
-            ctx.fillStyle = '#111827';
-            ctx.fillText(priceLabel, textX, textY);
-          }
+          const textWidth = ctx.measureText(priceLabel).width;
+          const preferredX = imageX + w + mmToPx(3);
+          const pageRight = PAGE_W - PAGE_PAD;
+          const fitsRight = preferredX + textWidth <= pageRight;
+          const textX = fitsRight ? preferredX : pageRight;
+          const textY = Math.max(PAGE_PAD, imageY + h / 2 - fontSize / 2);
+          ctx.textAlign = fitsRight ? 'left' : 'right';
+          ctx.fillStyle = 'rgba(255,255,255,.94)';
+          ctx.fillRect(
+            fitsRight ? textX - 6 : textX - textWidth - 6,
+            textY - 4,
+            textWidth + 12,
+            fontSize + 8
+          );
+          ctx.fillStyle = '#111827';
+          ctx.fillText(priceLabel, textX, textY);
         }
 
         curY += itemH + ROW_GAP;
@@ -1087,39 +1141,38 @@
         const largeCms    = largeList.length > 0 ? largeList : null;
 
         // --- 描画 ---
-        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms);
-        const smallCanvas = smallCms ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms) : null;
-        const largeCanvas = largeCms ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms) : null;
+        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms, PREVIEW_SCALE);
+        const smallCanvas = smallCms
+          ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms, PREVIEW_SCALE)
+          : null;
+        const largeCanvas = largeCms
+          ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms, PREVIEW_SCALE)
+          : null;
 
         // --- UI反映 ---
         function setCard(key, previewCanvas, saveBtn, labelEl, canvas, sizes) {
           const card = previewCanvas.closest('.output-card');
           if (canvas && sizes && sizes.length > 0) {
-            const previousUrl = renderedUrls[key];
             renderedFiles[key] = null;
+            exportSpecs[key] = { img, effW, effH, longEdge, rotate, sizes: [...sizes] };
             saveBtn.disabled = true;
+            saveBtn.textContent = '保存準備中…';
             card.style.display = 'block';
             labelEl.textContent = `長辺：${sizes.map(formatMmFromCm).join(' / ')}`;
 
-            // プレビューはCanvasへ直接表示し、料金はこの画面用Canvasだけに描く。
+            // 低解像度プレビューを直接表示し、料金は画面用Canvasだけに描く。
             previewCanvas.width = canvas.width;
             previewCanvas.height = canvas.height;
             const previewCtx = previewCanvas.getContext('2d', { alpha: false });
             previewCtx.drawImage(canvas, 0, 0);
+            previewCtx.save();
+            previewCtx.scale(PREVIEW_SCALE, PREVIEW_SCALE);
             drawScreenPrices(previewCtx, effW, effH, longEdge, sizes);
-
-            // canvas本体には料金がないため、保存ファイルにも料金は含まれない。
-            canvas.toBlob((blob) => {
-              if (!blob || revision !== renderRevision) return;
-              if (previousUrl && previousUrl.startsWith('blob:')) URL.revokeObjectURL(previousUrl);
-              const url = URL.createObjectURL(blob);
-              renderedUrls[key] = url;
-              renderedFiles[key] = new File([blob], `stencil_${key}.png`, { type: 'image/png' });
-              saveBtn.disabled = false;
-            }, 'image/png');
+            previewCtx.restore();
           } else {
             card.style.display = 'none';
             renderedFiles[key] = null;
+            exportSpecs[key] = null;
             if (renderedUrls[key] && renderedUrls[key].startsWith('blob:')) {
               URL.revokeObjectURL(renderedUrls[key]);
             }
@@ -1130,6 +1183,7 @@
         setCard('main',  $id('img-main'),  $id('save-main'),  $id('label-main'),  mainCanvas,  mainCms);
         setCard('small', $id('img-small'), $id('save-small'), $id('label-small'), smallCanvas, smallCms);
         setCard('large', $id('img-large'), $id('save-large'), $id('label-large'), largeCanvas, largeCms);
+        scheduleExportPreparation(revision);
 
         $id('outputSection').style.display = 'flex';
         showStatus('');
