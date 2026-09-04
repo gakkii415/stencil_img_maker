@@ -1,0 +1,1000 @@
+<!doctype html>
+
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Stencil A4 Maker</title>
+  <style>
+    :root {
+      --ink: #111827; --muted: #6b7280; --line: #d9dee7; --soft: #f6f7f9;
+      --accent: #155eef; --accent-soft: #eef4ff; --success: #16794a;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+    body {
+      margin: 0 auto; padding: 20px 16px 32px; max-width: 520px;
+      background: #fff; color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, summary { font: inherit; }
+    button, summary { -webkit-tap-highlight-color: transparent; }
+    .app-header { margin-bottom: 18px; }
+    h1 { margin: 0; font-size: 23px; line-height: 1.15; letter-spacing: -.025em; }
+    #dropZone {
+      display: block; width: 100%; min-height: 156px; padding: 36px 20px;
+      margin-bottom: 14px; cursor: pointer;
+      border: 1.5px dashed #9aa4b2; border-radius: var(--radius); background: var(--soft);
+      text-align: center; transition: border-color .18s, background .18s;
+    }
+    #dropZone.over { border-color: var(--accent); background: var(--accent-soft); }
+    #dropZone.has-file { border-style: solid; border-color: #a9d5bf; background: #f4fbf7; }
+    .upload-mark {
+      width: 48px; height: 48px; display: grid; place-items: center;
+      margin: 0 auto 10px; border: 1px solid var(--line); border-radius: 8px;
+      background: #fff; color: var(--ink);
+    }
+    .upload-mark svg { width: 22px; height: 22px; }
+    #dropZone .main-text { min-width: 0; color: var(--ink); font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+    #dropZone .sub-text { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    #fileInput { display: none; }
+    .crop-section {
+      display: none; width: 100%; margin: -2px 0 14px;
+      border: 0; background: #fff;
+    }
+    .crop-section summary {
+      display: flex; align-items: center; position: relative; width: 100%; min-height: 44px;
+      padding: 10px 52px 10px 12px; cursor: pointer; list-style: none;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff;
+      color: var(--ink); font-size: 13px; font-weight: 700;
+    }
+    .crop-section summary::-webkit-details-marker { display: none; }
+    .crop-section summary::after {
+      content: "開く"; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      color: var(--accent); font-size: 11px; font-weight: 600;
+    }
+    .crop-section[open] summary { border-color: var(--accent); background: var(--accent-soft); }
+    .crop-section[open] summary::after { content: "閉じる"; }
+    .crop-content { padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    .crop-stage {
+      width: 100%; min-height: 210px; max-height: 60dvh; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; border: 1px solid #303641; border-radius: 4px; background: #171a20;
+    }
+    #cropCanvas { display: block; max-width: 100%; max-height: 58dvh; touch-action: none; }
+    .crop-tools, .crop-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .crop-tools button, .crop-actions button {
+      flex: 1; min-width: 0; min-height: 44px; padding: 10px 8px; cursor: pointer;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
+      font-size: 13px; font-weight: 700;
+    }
+    .crop-actions #cropApplyBtn { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .tool-panel {
+      margin-bottom: 16px; padding: 16px 0;
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fff;
+    }
+    .panel-title { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+    .settings-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    .field { display: block; min-width: 0; }
+    .field-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
+    .input-shell {
+      display: flex; align-items: center; width: 100%; height: 48px;
+      border: 1px solid var(--line); border-radius: 6px; background: var(--soft); overflow: hidden;
+    }
+    .input-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: #fff; }
+    .input-shell input {
+      min-width: 0; width: 100%; height: 100%; padding: 0 6px 0 12px;
+      border: 0; outline: 0; background: transparent; color: var(--ink);
+      font-size: 21px; font-weight: 700; text-align: right;
+    }
+    .input-shell .unit { padding-right: 12px; color: var(--muted); font-size: 13px; font-weight: 600; }
+    #orientBtn {
+      display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px;
+      margin-top: 14px; padding: 10px 12px; cursor: pointer;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
+      font-size: 13px; font-weight: 700;
+    }
+    .orient-current { display: flex; align-items: center; gap: 10px; }
+    .orientation-phone { display: inline-block; font-size: 23px; line-height: 1; transition: transform .2s ease; }
+    #orientBtn.landscape .orientation-phone { transform: rotate(90deg); }
+    #orientBtn::after { content: "切り替え"; color: var(--accent); font-size: 11px; font-weight: 600; }
+    .status { margin: 0 0 12px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .status:empty { display: none; }
+    .error { color: #b42318; }
+    .output-section { display: none; flex-direction: column; gap: 14px; width: 100%; min-width: 0; }
+    .output-card {
+      width: 100%; min-width: 0; padding: 18px 0 0; overflow: hidden;
+      border-top: 1px solid var(--line); background: #fff;
+    }
+    .output-card .card-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; color: var(--ink); font-size: 13px; font-weight: 700; }
+    .badge {
+      padding: 3px 7px; border: 0; border-radius: 4px;
+      font-size: 10px; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
+    }
+    .badge-main { background: var(--accent); color: #fff; }
+    .badge-small { background: #e8f7fa; color: #0e7490; border: 1px solid #bde8ef; }
+    .badge-large { background: #fff2e2; color: #b54708; border: 1px solid #f4d3ac; }
+    .output-card .card-title span:last-child { min-width: 0; overflow-wrap: anywhere; }
+    .output-card img { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
+    .photo-save {
+      width: 100%; min-height: 44px; margin-top: 10px; padding: 10px 16px; cursor: pointer;
+      border: 0; border-radius: 6px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700;
+    }
+    .photo-save:disabled { opacity: .4; cursor: default; }
+    .app-version { margin-top: 16px; color: #a0a7b2; font-size: 9px; text-align: right; }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>A4 Stencil Maker</h1>
+  </header>
+
+  <div id="dropZone">
+    <div class="upload-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 16.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2.5" />
+        <path d="M12 4v11M8 8l4-4 4 4" />
+      </svg>
+    </div>
+    <div>
+      <div class="main-text">画像を選択</div>
+      <div class="sub-text">写真ライブラリから選択</div>
+    </div>
+  </div>
+  <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif" />
+
+  <details class="crop-section" id="cropSection">
+    <summary>トリミング</summary>
+    <div class="crop-content">
+      <div class="crop-stage"><canvas id="cropCanvas"></canvas></div>
+      <div class="crop-tools">
+        <button id="cropAutoBtn" type="button">自動範囲</button>
+        <button id="cropFullBtn" type="button">画像全体</button>
+      </div>
+      <div class="crop-actions">
+        <button id="cropApplyBtn" type="button">この範囲を適用</button>
+      </div>
+    </div>
+  </details>
+
+  <section class="tool-panel">
+    <p class="panel-title">出力設定</p>
+    <div class="settings-grid">
+      <label class="field" for="baseMm">
+        <span class="field-label">長辺</span>
+        <span class="input-shell">
+          <input id="baseMm" type="number" inputmode="decimal" min="1" max="250" step="1" value="70" />
+          <span class="unit">mm</span>
+        </span>
+      </label>
+      <label class="field" for="stepMm">
+        <span class="field-label">刻み幅</span>
+        <span class="input-shell">
+          <input id="stepMm" type="number" inputmode="decimal" min="1" max="50" step="1" value="5" />
+          <span class="unit">mm</span>
+        </span>
+      </label>
+    </div>
+    <button id="orientBtn" type="button">
+      <span class="orient-current"><span class="orientation-phone" aria-hidden="true">📱</span><span id="orientLabel">配置方向：横</span></span>
+    </button>
+  </section>
+
+  <p class="status" id="status">画像を選択すると自動で生成します</p>
+
+  <div class="output-section" id="outputSection">
+    <div class="output-card" id="card-main">
+      <div class="card-title"><span class="badge badge-main">メイン</span><span id="label-main"></span></div>
+      <img id="img-main" alt="main" />
+      <button class="photo-save" id="save-main" type="button">写真に保存</button>
+    </div>
+    <div class="output-card" id="card-small">
+      <div class="card-title"><span class="badge badge-small">小さいバージョン</span><span id="label-small"></span></div>
+      <img id="img-small" alt="small" />
+      <button class="photo-save" id="save-small" type="button">写真に保存</button>
+    </div>
+    <div class="output-card" id="card-large">
+      <div class="card-title"><span class="badge badge-large">大きいバージョン</span><span id="label-large"></span></div>
+      <img id="img-large" alt="large" />
+      <button class="photo-save" id="save-large" type="button">写真に保存</button>
+    </div>
+  </div>
+
+  <div class="app-version">v17</div>
+
+  <script>
+    'use strict';
+
+    const DPI = 300;
+    const SIZE_CORRECTION = 1.016; // 実測値に合わせて寸法を1.6%拡大
+    const $id = (id) => document.getElementById(id);
+
+    // --- 定数 ---
+    function cmToPx(cm) { return (cm / 2.54) * DPI * SIZE_CORRECTION; }
+    function mmToPx(mm) { return (mm / 25.4) * DPI; }
+    const PAGE_W    = Math.round(mmToPx(192.75));
+    const PAGE_H    = Math.round(mmToPx(276.87));
+    const PAGE_PAD  = Math.round(mmToPx(3));       // ページ端の安全余白 3mm
+    const RULER     = Math.round(cmToPx(0.24));    // 個別ルーラーの細い帯 2.4mm
+    const RULER_GAP = Math.round(cmToPx(0.12));    // 画像とルーラーの間 1.2mm
+    const ROW_GAP   = Math.round(cmToPx(0.70));    // 上下の異なるサイズ間 7mm
+    const COL_GAP   = Math.round(cmToPx(0.70));    // 横に並べる同一画像間 7mm
+    const CONTENT_W = PAGE_W - PAGE_PAD * 2;
+    const CONTENT_H = PAGE_H - PAGE_PAD * 2;
+    const MIN_CM    = 0.1;  // 最小サイズ 1mm
+    const MAX_COLS  = 2;    // 横に並べる最大枚数
+
+    // --- UI ---
+    let longSideVertical = false;
+    const orientBtn = $id('orientBtn');
+    orientBtn.addEventListener('click', () => {
+      longSideVertical = !longSideVertical;
+      updateOrientBtn();
+      if (currentDataURL) scheduleGenerate();
+    });
+    function updateOrientBtn() {
+      $id('orientLabel').textContent = `配置方向：${longSideVertical ? '縦' : '横'}`;
+      orientBtn.classList.toggle('landscape', !longSideVertical);
+      orientBtn.setAttribute('aria-label', `配置方向は${longSideVertical ? '縦' : '横'}。タップして切り替え`);
+    }
+    updateOrientBtn();
+
+    /**
+     * 自動配置では長辺を横にそろえる。
+     * 縦長画像は90度回転し、横長画像はそのまま使うため、
+     * アップロードやトリミングのたびに元画像の向きが変わっても結果が安定する。
+     */
+    function setAutomaticPlacementFromDimensions(width, height) {
+      if (!(width > 0 && height > 0)) return;
+      longSideVertical = false;
+      orientBtn.dataset.autoRotation = height > width ? 'rotated' : 'unchanged';
+      updateOrientBtn();
+    }
+
+    function shouldRotateForPlacement(width, height) {
+      const isPortrait = height > width;
+      return longSideVertical ? !isPortrait : isPortrait;
+    }
+
+    const dropZone  = $id('dropZone');
+    const fileInput = $id('fileInput');
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault(); dropZone.classList.remove('over');
+      const f = e.dataTransfer.files[0];
+      if (f && f.type.startsWith('image/')) handleFile(f);
+    });
+    fileInput.addEventListener('change', () => {
+      const f = fileInput.files[0];
+      fileInput.value = ''; // 同じ画像を続けて選び直してもchangeを発生させる
+      if (f) handleFile(f);
+    });
+    $id('baseMm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
+    let stepIsAutomatic = true;
+    $id('stepMm').addEventListener('input', () => {
+      stepIsAutomatic = $id('stepMm').value.trim() === '';
+      if (currentDataURL) scheduleGenerate();
+    });
+
+    let currentDataURL = null, generateTimer = null, fileLoadId = 0;
+    let currentWasCropped = false;
+    let originalDataURL = null, currentCropRect = null, autoCropRect = null;
+    const renderedFiles = { main: null, small: null, large: null };
+    const renderedUrls = { main: null, small: null, large: null };
+
+    for (const key of ['main', 'small', 'large']) {
+      $id(`save-${key}`).addEventListener('click', () => saveToPhotos(key));
+    }
+
+    async function saveToPhotos(key) {
+      const file = renderedFiles[key];
+      if (!file) return;
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+        } catch (err) {
+          if (err.name !== 'AbortError') showStatus('写真の共有に失敗しました', true);
+        }
+        return;
+      }
+      window.open(renderedUrls[key], '_blank');
+      showStatus('開いた画像を長押しして「写真に保存」を選択してください');
+    }
+
+    function handleFile(file) {
+      const loadId = ++fileLoadId;
+      dropZone.classList.add('has-file');
+      dropZone.querySelector('.main-text').textContent = file.name;
+      dropZone.querySelector('.sub-text').textContent  = '余白を自動調整します';
+      showStatus('読み込み・余白判定中…');
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        originalDataURL = e.target.result;
+        try {
+          const result = await autoCropDataURL(originalDataURL);
+          if (loadId !== fileLoadId) return;
+          currentDataURL = result.dataURL;
+          currentWasCropped = result.cropped;
+          currentCropRect = { ...result.cropRect };
+          autoCropRect = { ...result.cropRect };
+          $id('cropSection').style.display = 'block';
+          setAutomaticPlacementFromDimensions(result.cropRect.w, result.cropRect.h);
+          dropZone.querySelector('.sub-text').textContent = result.cropped
+            ? '余白を自動トリミング済み・タップで画像変更'
+            : '余白調整不要・タップで画像変更';
+          scheduleGenerate();
+        } catch (err) {
+          if (loadId !== fileLoadId) return;
+          console.warn('自動トリミングを省略しました', err);
+          const original = await loadImage(originalDataURL);
+          if (loadId !== fileLoadId) return;
+          const fullRect = { x: 0, y: 0, w: original.naturalWidth, h: original.naturalHeight };
+          currentDataURL = originalDataURL;
+          currentWasCropped = false;
+          currentCropRect = { ...fullRect };
+          autoCropRect = { ...fullRect };
+          $id('cropSection').style.display = 'block';
+          setAutomaticPlacementFromDimensions(fullRect.w, fullRect.h);
+          dropZone.querySelector('.sub-text').textContent = '画像をそのまま使用・タップで画像変更';
+          scheduleGenerate();
+        }
+      };
+      reader.onerror = ()  => showStatus('ファイルの読み込みに失敗しました', true);
+      reader.readAsDataURL(file);
+    }
+
+    function scheduleGenerate() {
+      clearTimeout(generateTimer);
+      generateTimer = setTimeout(generate, 300);
+    }
+
+    function showStatus(msg, isError = false) {
+      const el = $id('status');
+      el.textContent = msg;
+      el.className = 'status' + (isError ? ' error' : '');
+    }
+
+    function loadImage(dataURL) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload  = () => resolve(img);
+        img.onerror = () => reject(new Error('画像のデコードに失敗しました'));
+        img.src = dataURL;
+      });
+    }
+
+    /**
+     * 四隅の色を背景色とみなし、大きな単色・透明余白を自動で除去する。
+     * 内容を切り詰めないよう検出範囲の外側に1%の安全余白を残す。
+     */
+    async function autoCropDataURL(dataURL) {
+      const img = await loadImage(dataURL);
+      const fullRect = { x: 0, y: 0, w: img.naturalWidth, h: img.naturalHeight };
+      const maxSide = 1600;
+      const analysisScale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const aw = Math.max(1, Math.round(img.naturalWidth * analysisScale));
+      const ah = Math.max(1, Math.round(img.naturalHeight * analysisScale));
+      const canvas = document.createElement('canvas');
+      canvas.width = aw; canvas.height = ah;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, aw, ah);
+      const pixels = ctx.getImageData(0, 0, aw, ah).data;
+
+      // 透明ピクセルは白に合成してから比較する。
+      const composite = (index, channel) => {
+        const alpha = pixels[index + 3] / 255;
+        return Math.round(pixels[index + channel] * alpha + 255 * (1 - alpha));
+      };
+      const samples = [[], [], []];
+      const patch = Math.max(2, Math.min(24, Math.round(Math.min(aw, ah) * 0.025)));
+      const corners = [[0, 0], [aw - patch, 0], [0, ah - patch], [aw - patch, ah - patch]];
+      for (const [sx, sy] of corners) {
+        for (let y = sy; y < sy + patch; y++) {
+          for (let x = sx; x < sx + patch; x++) {
+            const i = (y * aw + x) * 4;
+            samples[0].push(composite(i, 0));
+            samples[1].push(composite(i, 1));
+            samples[2].push(composite(i, 2));
+          }
+        }
+      }
+      const median = (values) => {
+        values.sort((a, b) => a - b);
+        return values[Math.floor(values.length / 2)];
+      };
+      const bg = samples.map(median);
+      const thresholdSq = 30 * 30;
+      let minX = aw, minY = ah, maxX = -1, maxY = -1;
+      for (let y = 0; y < ah; y++) {
+        for (let x = 0; x < aw; x++) {
+          const i = (y * aw + x) * 4;
+          const dr = composite(i, 0) - bg[0];
+          const dg = composite(i, 1) - bg[1];
+          const db = composite(i, 2) - bg[2];
+          if (dr * dr + dg * dg + db * db > thresholdSq) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+
+      if (maxX < minX || maxY < minY) return { dataURL, cropped: false, cropRect: fullRect };
+      const pad = Math.max(2, Math.round(Math.max(aw, ah) * 0.01));
+      minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+      maxX = Math.min(aw - 1, maxX + pad); maxY = Math.min(ah - 1, maxY + pad);
+      const cropW = maxX - minX + 1, cropH = maxY - minY + 1;
+      if (cropW / aw > 0.97 && cropH / ah > 0.97) {
+        return { dataURL, cropped: false, cropRect: fullRect };
+      }
+
+      const sourceX = Math.max(0, Math.floor(minX / analysisScale));
+      const sourceY = Math.max(0, Math.floor(minY / analysisScale));
+      const sourceW = Math.min(img.naturalWidth - sourceX, Math.ceil(cropW / analysisScale));
+      const sourceH = Math.min(img.naturalHeight - sourceY, Math.ceil(cropH / analysisScale));
+      const cropRect = { x: sourceX, y: sourceY, w: sourceW, h: sourceH };
+      return { dataURL: cropLoadedImage(img, cropRect), cropped: true, cropRect };
+    }
+
+    function cropLoadedImage(img, rect) {
+      const cropped = document.createElement('canvas');
+      cropped.width = Math.max(1, Math.round(rect.w));
+      cropped.height = Math.max(1, Math.round(rect.h));
+      cropped.getContext('2d').drawImage(
+        img, rect.x, rect.y, rect.w, rect.h, 0, 0, cropped.width, cropped.height
+      );
+      return cropped.toDataURL('image/png');
+    }
+
+    // --- 手動トリミング（必要なときだけ開く） ---
+    const cropSection = $id('cropSection');
+    const cropCanvas = $id('cropCanvas');
+    let editorImage = null, editorRect = null, editorDrag = null;
+    let editorView = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1, dpr: 1 };
+
+    cropSection.addEventListener('toggle', () => {
+      if (cropSection.open) openCropEditor();
+      else editorDrag = null;
+    });
+    $id('cropAutoBtn').addEventListener('click', () => {
+      if (!autoCropRect) return;
+      editorRect = { ...autoCropRect };
+      syncOrientationFromCropRect();
+      drawCropEditor();
+    });
+    $id('cropFullBtn').addEventListener('click', () => {
+      if (!editorImage) return;
+      editorRect = { x: 0, y: 0, w: editorImage.naturalWidth, h: editorImage.naturalHeight };
+      syncOrientationFromCropRect();
+      drawCropEditor();
+    });
+    $id('cropApplyBtn').addEventListener('click', async () => {
+      if (!editorImage || !editorRect) return;
+      const iw = editorImage.naturalWidth, ih = editorImage.naturalHeight;
+      currentCropRect = {
+        x: Math.max(0, Math.round(editorRect.x)),
+        y: Math.max(0, Math.round(editorRect.y)),
+        w: Math.min(iw, Math.max(1, Math.round(editorRect.w))),
+        h: Math.min(ih, Math.max(1, Math.round(editorRect.h)))
+      };
+      currentCropRect.w = Math.min(currentCropRect.w, iw - currentCropRect.x);
+      currentCropRect.h = Math.min(currentCropRect.h, ih - currentCropRect.y);
+      currentDataURL = cropLoadedImage(editorImage, currentCropRect);
+      currentWasCropped = !isFullCrop(currentCropRect, iw, ih);
+      dropZone.querySelector('.sub-text').textContent = currentWasCropped
+        ? 'トリミング調整済み・タップで画像変更'
+        : '画像全体を使用・タップで画像変更';
+      setAutomaticPlacementFromDimensions(currentCropRect.w, currentCropRect.h);
+      cropSection.open = false;
+      scheduleGenerate();
+    });
+
+    async function openCropEditor() {
+      if (!originalDataURL || !currentCropRect) return;
+      editorImage = await loadImage(originalDataURL);
+      editorRect = { ...currentCropRect };
+      syncOrientationFromCropRect();
+      requestAnimationFrame(sizeCropCanvas);
+    }
+
+    function syncOrientationFromCropRect() {
+      if (!editorRect) return;
+      setAutomaticPlacementFromDimensions(editorRect.w, editorRect.h);
+    }
+
+    function sizeCropCanvas() {
+      if (!editorImage || !cropSection.open) return;
+      const stage = cropCanvas.parentElement;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const safeMargin = 32;
+      const maxW = Math.max(220, stage.clientWidth);
+      const maxH = Math.max(240, window.innerHeight * 0.54);
+      const availableW = Math.max(1, maxW - safeMargin * 2);
+      const availableH = Math.max(1, maxH - safeMargin * 2);
+      const fit = Math.min(
+        availableW / editorImage.naturalWidth,
+        availableH / editorImage.naturalHeight
+      );
+      const imageCssW = Math.max(1, editorImage.naturalWidth * fit);
+      const imageCssH = Math.max(1, editorImage.naturalHeight * fit);
+      const cssW = imageCssW + safeMargin * 2;
+      const cssH = imageCssH + safeMargin * 2;
+      cropCanvas.style.width = `${cssW}px`;
+      cropCanvas.style.height = `${cssH}px`;
+      cropCanvas.width = Math.max(1, Math.round(cssW * dpr));
+      cropCanvas.height = Math.max(1, Math.round(cssH * dpr));
+      editorView = {
+        offsetX: safeMargin * dpr,
+        offsetY: safeMargin * dpr,
+        scaleX: imageCssW * dpr / editorImage.naturalWidth,
+        scaleY: imageCssH * dpr / editorImage.naturalHeight,
+        dpr
+      };
+      drawCropEditor();
+    }
+
+    function drawCropEditor() {
+      if (!editorImage || !editorRect || !cropCanvas.width) return;
+      const ctx = cropCanvas.getContext('2d');
+      const { offsetX, offsetY, scaleX, scaleY, dpr } = editorView;
+      const imageW = editorImage.naturalWidth * scaleX;
+      const imageH = editorImage.naturalHeight * scaleY;
+      const x = offsetX + editorRect.x * scaleX;
+      const y = offsetY + editorRect.y * scaleY;
+      const w = editorRect.w * scaleX;
+      const h = editorRect.h * scaleY;
+      const handleR = 15 * dpr;
+
+      ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+      ctx.fillStyle = '#171a20';
+      ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+      ctx.drawImage(editorImage, offsetX, offsetY, imageW, imageH);
+      ctx.fillStyle = 'rgba(0,0,0,.58)';
+      ctx.fillRect(offsetX, offsetY, imageW, y - offsetY);
+      ctx.fillRect(offsetX, y + h, imageW, offsetY + imageH - y - h);
+      ctx.fillRect(offsetX, y, x - offsetX, h);
+      ctx.fillRect(x + w, y, offsetX + imageW - x - w, h);
+      ctx.strokeStyle = '#31c36b'; ctx.lineWidth = 2 * dpr;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#31c36b'; ctx.lineWidth = 3 * dpr;
+      for (const [hx, hy] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h]]) {
+        ctx.beginPath(); ctx.arc(hx, hy, handleR, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+    }
+
+    function cropPointerPosition(event) {
+      const bounds = cropCanvas.getBoundingClientRect();
+      const canvasX = (event.clientX - bounds.left) * cropCanvas.width / bounds.width;
+      const canvasY = (event.clientY - bounds.top) * cropCanvas.height / bounds.height;
+      return {
+        x: (canvasX - editorView.offsetX) / editorView.scaleX,
+        y: (canvasY - editorView.offsetY) / editorView.scaleY,
+        bounds
+      };
+    }
+
+    cropCanvas.addEventListener('pointerdown', (event) => {
+      if (!editorImage || !editorRect) return;
+      event.preventDefault();
+      const point = cropPointerPosition(event);
+      // 見た目より広い48pxのタッチ判定で、指でも角をつかみやすくする。
+      const canvasPerCssPx = cropCanvas.width / point.bounds.width;
+      const threshold = 48 * canvasPerCssPx / editorView.scaleX;
+      const corners = {
+        nw: [editorRect.x, editorRect.y],
+        ne: [editorRect.x + editorRect.w, editorRect.y],
+        sw: [editorRect.x, editorRect.y + editorRect.h],
+        se: [editorRect.x + editorRect.w, editorRect.y + editorRect.h]
+      };
+      let type = null, nearest = Infinity;
+      for (const [name, [x, y]] of Object.entries(corners)) {
+        const distance = Math.hypot(point.x - x, point.y - y);
+        if (distance < nearest && distance <= threshold) { nearest = distance; type = name; }
+      }
+      if (!type && point.x >= editorRect.x && point.x <= editorRect.x + editorRect.w
+        && point.y >= editorRect.y && point.y <= editorRect.y + editorRect.h) type = 'move';
+      if (!type) return;
+      editorDrag = { type, startX: point.x, startY: point.y, rect: { ...editorRect } };
+      cropCanvas.setPointerCapture(event.pointerId);
+    });
+
+    cropCanvas.addEventListener('pointermove', (event) => {
+      if (!editorDrag || !editorImage) return;
+      event.preventDefault();
+      const point = cropPointerPosition(event);
+      const dx = point.x - editorDrag.startX, dy = point.y - editorDrag.startY;
+      const start = editorDrag.rect;
+      const iw = editorImage.naturalWidth, ih = editorImage.naturalHeight;
+      const minW = Math.max(8, iw * 0.02), minH = Math.max(8, ih * 0.02);
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      let rect = { ...start };
+
+      if (editorDrag.type === 'move') {
+        rect.x = clamp(start.x + dx, 0, iw - start.w);
+        rect.y = clamp(start.y + dy, 0, ih - start.h);
+      } else {
+        const right = start.x + start.w, bottom = start.y + start.h;
+        if (editorDrag.type.includes('n')) {
+          rect.y = clamp(start.y + dy, 0, bottom - minH); rect.h = bottom - rect.y;
+        }
+        if (editorDrag.type.includes('s')) rect.h = clamp(start.h + dy, minH, ih - start.y);
+        if (editorDrag.type.includes('w')) {
+          rect.x = clamp(start.x + dx, 0, right - minW); rect.w = right - rect.x;
+        }
+        if (editorDrag.type.includes('e')) rect.w = clamp(start.w + dx, minW, iw - start.x);
+      }
+      editorRect = rect;
+      syncOrientationFromCropRect();
+      drawCropEditor();
+    });
+
+    const endCropDrag = () => { editorDrag = null; };
+    cropCanvas.addEventListener('pointerup', endCropDrag);
+    cropCanvas.addEventListener('pointercancel', endCropDrag);
+    window.addEventListener('resize', () => {
+      if (cropSection.open) requestAnimationFrame(sizeCropCanvas);
+    });
+
+    function isFullCrop(rect, width, height) {
+      return rect.x <= 1 && rect.y <= 1
+        && Math.abs(rect.w - width) <= 1 && Math.abs(rect.h - height) <= 1;
+    }
+
+    function drawImageTransformed(ctx, img, x, y, w, h, rotate) {
+      ctx.save();
+      ctx.translate(x + w / 2, y + h / 2);
+      if (rotate) ctx.rotate(Math.PI / 2);
+      ctx.scale(-1, 1);
+      const dw = rotate ? h : w;
+      const dh = rotate ? w : h;
+      ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    }
+
+    function formatMm(value) {
+      return `${Math.round(value)}mm`;
+    }
+
+    function formatMmFromCm(value) { return formatMm(value * 10); }
+
+    /** 画像ごとに、上と左へ細い1mm刻みの物差しを描く。 */
+    function drawMiniRulers(ctx, x, y, w, h) {
+      const tickLong = RULER * 0.58 + mmToPx(1);
+      const tickMedium = mmToPx(1.5);
+      const tickShort = RULER * 0.34;
+      const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
+      const horizontalY = y - RULER_GAP;
+      const verticalX = x - RULER_GAP;
+      const widthCm = w / cmToPx(1);
+      const heightCm = h / cmToPx(1);
+      const widthMm = widthCm * 10;
+      const heightMm = heightCm * 10;
+
+      ctx.save();
+      ctx.strokeStyle = '#555'; ctx.fillStyle = '#444';
+      ctx.lineWidth = Math.max(1, Math.round(mmToPx(0.12)));
+      ctx.font = `${fontSize}px sans-serif`;
+
+      // 上の物差し
+      ctx.beginPath(); ctx.moveTo(x, horizontalY); ctx.lineTo(x + w, horizontalY); ctx.stroke();
+      for (let d = 0; d <= widthMm + 0.001; d += 1) {
+        const px = x + cmToPx(d / 10);
+        const tickLength = d % 10 === 0 ? tickLong : d % 5 === 0 ? tickMedium : tickShort;
+        ctx.beginPath();
+        ctx.moveTo(px, horizontalY);
+        ctx.lineTo(px, horizontalY - tickLength);
+        ctx.stroke();
+      }
+
+      // 左の物差し
+      ctx.beginPath(); ctx.moveTo(verticalX, y); ctx.lineTo(verticalX, y + h); ctx.stroke();
+      for (let d = 0; d <= heightMm + 0.001; d += 1) {
+        const py = y + cmToPx(d / 10);
+        const tickLength = d % 10 === 0 ? tickLong : d % 5 === 0 ? tickMedium : tickShort;
+        ctx.beginPath();
+        ctx.moveTo(verticalX, py);
+        ctx.lineTo(verticalX - tickLength, py);
+        ctx.stroke();
+      }
+
+      // 実寸値は白抜きで読みやすくし、定規の帯を太くしない。
+      const topLabel = formatMm(widthMm);
+      const topWidth = ctx.measureText(topLabel).width;
+      const topX = x + w / 2;
+      const topY = horizontalY - fontSize * 0.2;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(topX - topWidth / 2 - 4, topY - fontSize, topWidth + 8, fontSize + 4);
+      ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(topLabel, topX, topY);
+
+      const sideLabel = formatMm(heightMm);
+      const sideWidth = ctx.measureText(sideLabel).width;
+      const sideX = verticalX - fontSize * 0.2;
+      const sideY = y + h / 2;
+      ctx.save();
+      ctx.translate(sideX, sideY); ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(-sideWidth / 2 - 4, -fontSize, sideWidth + 8, fontSize + 4);
+      ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(sideLabel, 0, 0);
+      ctx.restore();
+      ctx.restore();
+    }
+
+    // =====================================================
+    // 核心ロジック：画像サイズ計算・ページ構成・描画
+    // すべて同じ imgPx() 関数を使って一貫性を保証する
+    // =====================================================
+
+    // cm → {w, h} px  ※ effW/effH/longEdge を引数で受け取る
+    function imgPx(cm, effW, effH, longEdge) {
+      const s = cmToPx(cm) / longEdge;
+      return { w: effW * s, h: effH * s };
+    }
+
+    /**
+     * cmList を上から積み上げて「実際に描ける行リスト」を返す。
+     * fits() の代わりにこれを唯一の判定・描画ソースとして使う。
+     * 戻り値: [{ cm, w, h }, ...] （収まる行だけ）
+     */
+    function resolveRows(cmList, effW, effH, longEdge) {
+      const rows = [];
+      let usedH = 0;
+      for (const cm of cmList) {
+        const { w, h } = imgPx(cm, effW, effH, longEdge);
+        const itemW = RULER + RULER_GAP + w;
+        const itemH = RULER + RULER_GAP + h;
+        const needed = usedH + itemH + (rows.length > 0 ? ROW_GAP : 0);
+        if (needed > CONTENT_H || itemW > CONTENT_W) break;
+        rows.push({ cm, w, h, itemW, itemH });
+        usedH = needed;
+      }
+      return rows;
+    }
+
+    /**
+     * anchor を中心に小・大を対で広げ、対が入らなくなったら
+     * 大きい側を優先して片側ずつ追加し、ページの空きを使い切る。
+     */
+    function buildPageList(anchorCm, step, effW, effH, longEdge) {
+      const base = resolveRows([anchorCm], effW, effH, longEdge);
+      if (base.length === 0) return [anchorCm]; // 入らなくても最低1種は返す
+
+      const list = [anchorCm];
+      const fitsAll = (candidate) => {
+        const sorted = [...candidate].sort((a, b) => a - b);
+        return resolveRows(sorted, effW, effH, longEdge).length === sorted.length;
+      };
+      let level = 1;
+      while (true) {
+        const down = Math.round((anchorCm - step * level) * 100) / 100;
+        const up = Math.round((anchorCm + step * level) * 100) / 100;
+        const hasDown = down >= MIN_CM;
+        const pair = hasDown ? [...list, down, up] : null;
+
+        if (pair && fitsAll(pair)) {
+          list.push(down, up);
+          level++;
+          continue;
+        }
+
+        // 対で入らない場合も、まず大きい側だけで入るか確認する。
+        let direction = 0;
+        if (fitsAll([...list, up])) {
+          list.push(up);
+          direction = 1;
+        } else if (hasDown && fitsAll([...list, down])) {
+          list.push(down);
+          direction = -1;
+        }
+
+        if (direction === 0) break;
+
+        // 選んだ側に、隣接サイズを入る限り追加する。
+        level++;
+        while (true) {
+          const next = Math.round((anchorCm + direction * step * level) * 100) / 100;
+          if (next < MIN_CM || !fitsAll([...list, next])) break;
+          list.push(next);
+          level++;
+        }
+        break;
+      }
+
+      return list.sort((a, b) => a - b);
+    }
+
+    /**
+     * startCm から下方向のみに拡張するページリスト。
+     * 小さいバージョン用。
+     */
+    function buildPageListDown(startCm, step, effW, effH, longEdge) {
+      const list = [];
+      let cm = Math.round(startCm * 100) / 100;
+      while (cm >= MIN_CM) {
+        const candidate = [...list, cm].sort((a, b) => a - b);
+        const rows = resolveRows(candidate, effW, effH, longEdge);
+        if (rows.length < candidate.length) break;
+        list.push(cm);
+        const next = Math.round((cm - step) * 100) / 100;
+        if (next < MIN_CM) break;
+        cm = next;
+      }
+      return list.sort((a, b) => a - b);
+    }
+
+    /**
+     * startCm から上方向のみに拡張するページリスト。
+     * 大きいバージョン用。
+     */
+    function buildPageListUp(startCm, step, effW, effH, longEdge) {
+      const list = [];
+      let cm = Math.round(startCm * 100) / 100;
+      while (true) {
+        const candidate = [...list, cm].sort((a, b) => a - b);
+        const rows = resolveRows(candidate, effW, effH, longEdge);
+        if (rows.length < candidate.length) break;
+        list.push(cm);
+        cm = Math.round((cm + step) * 100) / 100;
+      }
+      return list.sort((a, b) => a - b);
+    }
+
+    /**
+     * ステップ決定：
+     * anchor を中心に 0.5cm 刻みで 4 種が 1 ページに収まるなら 0.5cm、
+     * そうでなければ 1cm。
+     */
+    function calcStep(anchorCm, effW, effH, longEdge) {
+      const half = Math.floor(4 / 2);
+      const test = Array.from({ length: 4 }, (_, i) =>
+        Math.max(MIN_CM, Math.round((anchorCm + (i - half) * 0.5) * 100) / 100)
+      );
+      const rows = resolveRows(test, effW, effH, longEdge);
+      return rows.length >= 4 ? 0.5 : 1.0;
+    }
+
+    /**
+     * cmList からキャンバスを生成して返す。
+     * resolveRows() で実際に入る行だけを描画するので絶対に重ならない。
+     */
+    function buildCanvas(img, effW, effH, longEdge, rotate, cmList) {
+      const canvas = document.createElement('canvas');
+      canvas.width  = PAGE_W;
+      canvas.height = PAGE_H;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // resolveRows で実際に入る行だけ取得
+      const rows = resolveRows(cmList, effW, effH, longEdge);
+      if (rows.length === 0) return canvas;
+
+      // 各行：入る枚数を自動計算し、行ごとに独立して中央配置する。
+      let curY = PAGE_PAD;
+      for (let row = 0; row < rows.length; row++) {
+        const { w, h, itemW, itemH } = rows[row];
+        const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
+        const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
+        const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
+        for (let col = 0; col < nCols; col++) {
+          const itemX = startX + col * (itemW + COL_GAP);
+          const imageX = itemX + RULER + RULER_GAP;
+          const imageY = curY + RULER + RULER_GAP;
+          drawMiniRulers(ctx, imageX, imageY, w, h);
+          drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
+        }
+        curY += itemH;
+        if (row < rows.length - 1) curY += ROW_GAP;
+      }
+
+      return canvas;
+    }
+
+    // =====================================================
+    // メイン生成処理
+    // =====================================================
+    async function generate() {
+      if (!currentDataURL) return;
+
+      const baseMm = parseFloat($id('baseMm').value);
+      const baseCm = baseMm / 10;
+      if (!Number.isFinite(baseMm) || baseMm <= 0) {
+        showStatus('長辺に正の数値を入力してください', true);
+        return;
+      }
+
+      showStatus('生成中…');
+
+      try {
+        const img = await loadImage(currentDataURL);
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        if (iw === 0 || ih === 0) throw new Error('画像サイズが不正です');
+
+        const rotate   = shouldRotateForPlacement(iw, ih);
+        const effW     = rotate ? ih : iw;
+        const effH     = rotate ? iw : ih;
+        const longEdge = Math.max(effW, effH);
+
+        // 未編集なら自動判定値を入力欄へ表示し、編集後はその値を全ページで使う。
+        const userStepMm = parseFloat($id('stepMm').value);
+        if (!stepIsAutomatic && (!Number.isFinite(userStepMm) || userStepMm <= 0)) {
+          showStatus('サイズの刻み幅に正の数値を入力してください', true);
+          return;
+        }
+
+        // --- メイン ---
+        const mainStep = stepIsAutomatic
+          ? calcStep(baseCm, effW, effH, longEdge)
+          : userStepMm / 10;
+        if (stepIsAutomatic) $id('stepMm').value = String(Math.round(mainStep * 10));
+        const mainCms  = buildPageList(baseCm, mainStep, effW, effH, longEdge);
+        const mainMin  = Math.min(...mainCms);
+        const mainMax  = Math.max(...mainCms);
+
+        // --- 小さいバージョン ---
+        // mainMin より小さいサイズから始める
+        const smallAnchor = Math.round((mainMin - mainStep) * 100) / 100;
+        let smallCms = null;
+        if (smallAnchor >= MIN_CM) {
+          const start = Math.round(smallAnchor * 100) / 100;
+          const list  = buildPageListDown(start, mainStep, effW, effH, longEdge);
+          if (list.length > 0) smallCms = list;
+        }
+
+        // --- 大きいバージョン ---
+        const largeAnchor = Math.round((mainMax + mainStep) * 100) / 100;
+        const largeList   = buildPageListUp(largeAnchor, mainStep, effW, effH, longEdge);
+        const largeCms    = largeList.length > 0 ? largeList : null;
+
+        // --- 描画 ---
+        const mainCanvas  = buildCanvas(img, effW, effH, longEdge, rotate, mainCms);
+        const smallCanvas = smallCms ? buildCanvas(img, effW, effH, longEdge, rotate, smallCms) : null;
+        const largeCanvas = largeCms ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms) : null;
+
+        // --- UI反映 ---
+        function setCard(key, imgEl, saveBtn, labelEl, canvas, sizes) {
+          const card = imgEl.closest('.output-card');
+          if (canvas && sizes && sizes.length > 0) {
+            const url = canvas.toDataURL('image/png');
+            imgEl.src = url;
+            renderedUrls[key] = url;
+            renderedFiles[key] = null;
+            saveBtn.disabled = true;
+            canvas.toBlob((blob) => {
+              if (!blob) return;
+              renderedFiles[key] = new File([blob], `stencil_${key}.png`, { type: 'image/png' });
+              saveBtn.disabled = false;
+            }, 'image/png');
+            card.style.display = 'block';
+            labelEl.textContent = `長辺：${sizes.map(formatMmFromCm).join(' / ')}`;
+          } else {
+            card.style.display = 'none';
+            renderedFiles[key] = null;
+            renderedUrls[key] = null;
+          }
+        }
+
+        setCard('main',  $id('img-main'),  $id('save-main'),  $id('label-main'),  mainCanvas,  mainCms);
+        setCard('small', $id('img-small'), $id('save-small'), $id('label-small'), smallCanvas, smallCms);
+        setCard('large', $id('img-large'), $id('save-large'), $id('label-large'), largeCanvas, largeCms);
+
+        $id('outputSection').style.display = 'flex';
+        showStatus('');
+
+      } catch (err) {
+        console.error(err);
+        showStatus('エラー：' + (err.message || '生成に失敗しました'), true);
+      }
+    }
+  </script>
+
+</body>
+</html>
