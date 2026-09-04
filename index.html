@@ -81,9 +81,6 @@
     .field-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
     .price-panel { margin: 0; }
     .output-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-    .price-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-    .price-panel-title { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-    .price-panel-note { margin: 0; color: var(--muted); font-size: 10px; }
     .price-field {
       display: grid; grid-template-columns: 72px minmax(0, 1fr);
       align-items: center; gap: 10px; min-width: 0;
@@ -132,7 +129,7 @@
     .badge-small { background: #e8f7fa; color: #0e7490; border: 1px solid #bde8ef; }
     .badge-large { background: #fff2e2; color: #b54708; border: 1px solid #f4d3ac; }
     .output-card .card-title span:last-child { min-width: 0; overflow-wrap: anywhere; }
-    .output-card img { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
+    .output-card canvas { display: block; width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 2px; }
     .photo-save {
       width: 100%; min-height: 44px; margin-top: 10px; padding: 10px 16px; cursor: pointer;
       border: 0; border-radius: 6px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700;
@@ -176,10 +173,6 @@
 
   <section class="tool-panel">
     <div class="price-panel">
-      <div class="price-panel-head">
-        <p class="price-panel-title">料金設定</p>
-        <p class="price-panel-note">全サイズ共通</p>
-      </div>
       <label class="field price-field" for="priceWhitespace">
         <span class="field-label">余白</span>
         <select id="priceWhitespace">
@@ -213,7 +206,6 @@
       </label>
     </div>
     <div class="output-panel">
-      <p class="panel-title">出力設定</p>
       <div class="settings-grid">
         <label class="field" for="baseMm">
           <span class="field-label">長辺</span>
@@ -241,22 +233,22 @@
   <div class="output-section" id="outputSection">
     <div class="output-card" id="card-main">
       <div class="card-title"><span class="badge badge-main">メイン</span><span id="label-main"></span></div>
-      <img id="img-main" alt="main" />
+      <canvas id="img-main" role="img" aria-label="メインのプレビュー"></canvas>
       <button class="photo-save" id="save-main" type="button">写真に保存</button>
     </div>
     <div class="output-card" id="card-small">
       <div class="card-title"><span class="badge badge-small">小さいバージョン</span><span id="label-small"></span></div>
-      <img id="img-small" alt="small" />
+      <canvas id="img-small" role="img" aria-label="小さいバージョンのプレビュー"></canvas>
       <button class="photo-save" id="save-small" type="button">写真に保存</button>
     </div>
     <div class="output-card" id="card-large">
       <div class="card-title"><span class="badge badge-large">大きいバージョン</span><span id="label-large"></span></div>
-      <img id="img-large" alt="large" />
+      <canvas id="img-large" role="img" aria-label="大きいバージョンのプレビュー"></canvas>
       <button class="photo-save" id="save-large" type="button">写真に保存</button>
     </div>
   </div>
 
-  <div class="app-version">v20</div>
+  <div class="app-version">v21</div>
 
   <script>
     'use strict';
@@ -351,7 +343,7 @@
     function formatPrice(value) {
       if (value === null) return '';
       if (typeof value !== 'number') return value;
-      return `${Math.round(value / 1000)},`;
+      return `¥${value.toLocaleString('ja-JP')}`;
     }
 
     // --- UI ---
@@ -794,7 +786,7 @@
     function formatMmFromCm(value) { return formatMm(value * 10); }
 
     /** 画像ごとに、上と左へ細い1mm刻みの物差しを描く。 */
-    function drawMiniRulers(ctx, x, y, w, h, price) {
+    function drawMiniRulers(ctx, x, y, w, h) {
       const tickLong = RULER * 0.58 + mmToPx(1);
       const tickMedium = mmToPx(1.5);
       const tickShort = RULER * 0.34;
@@ -834,8 +826,7 @@
       }
 
       // 実寸値は白抜きで読みやすくし、定規の帯を太くしない。
-      const priceLabel = formatPrice(price);
-      const topLabel = formatMm(widthMm) + (widthMm <= heightMm && priceLabel ? `  ${priceLabel}` : '');
+      const topLabel = formatMm(widthMm);
       const topWidth = ctx.measureText(topLabel).width;
       const topX = x + w / 2;
       const topY = horizontalY - fontSize * 0.2;
@@ -844,7 +835,7 @@
       ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillText(topLabel, topX, topY);
 
-      const sideLabel = formatMm(heightMm) + (heightMm < widthMm && priceLabel ? `  ${priceLabel}` : '');
+      const sideLabel = formatMm(heightMm);
       const sideWidth = ctx.measureText(sideLabel).width;
       const sideX = verticalX - fontSize * 0.2;
       const sideY = y + h / 2;
@@ -990,10 +981,7 @@
           const itemX = startX + col * (itemW + COL_GAP);
           const imageX = itemX + RULER + RULER_GAP;
           const imageY = curY + RULER + RULER_GAP;
-          const longMm = cm * 10;
-          const shortMm = longMm * Math.min(effW, effH) / Math.max(effW, effH);
-          const price = calculatePrice(longMm, shortMm);
-          drawMiniRulers(ctx, imageX, imageY, w, h, price);
+          drawMiniRulers(ctx, imageX, imageY, w, h);
           drawImageTransformed(ctx, img, imageX, imageY, w, h, rotate);
         }
         curY += itemH;
@@ -1001,6 +989,44 @@
       }
 
       return canvas;
+    }
+
+    /** 画面プレビューにだけ、各画像の上辺へ料金を重ねる。 */
+    function drawScreenPrices(ctx, effW, effH, longEdge, cmList) {
+      const rows = resolveRows(cmList, effW, effH, longEdge);
+      const fontSize = Math.max(24, Math.round(cmToPx(0.36)));
+      let curY = PAGE_PAD;
+      ctx.save();
+      ctx.font = `700 ${fontSize}px sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+
+      for (const { cm, w, h, itemW, itemH } of rows) {
+        const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
+        const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
+        const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
+        const longMm = cm * 10;
+        const shortMm = longMm * Math.min(effW, effH) / Math.max(effW, effH);
+        const priceLabel = formatPrice(calculatePrice(longMm, shortMm));
+
+        if (priceLabel) {
+          for (let col = 0; col < nCols; col++) {
+            const itemX = startX + col * (itemW + COL_GAP);
+            const imageX = itemX + RULER + RULER_GAP;
+            const imageY = curY + RULER + RULER_GAP;
+            const textX = imageX + w - mmToPx(0.8);
+            const textY = imageY + mmToPx(0.8);
+            const textWidth = ctx.measureText(priceLabel).width;
+            ctx.fillStyle = 'rgba(255,255,255,.92)';
+            ctx.fillRect(textX - textWidth - 6, textY - 4, textWidth + 12, fontSize + 8);
+            ctx.fillStyle = '#111827';
+            ctx.fillText(priceLabel, textX, textY);
+          }
+        }
+
+        curY += itemH + ROW_GAP;
+      }
+      ctx.restore();
     }
 
     // =====================================================
@@ -1066,20 +1092,27 @@
         const largeCanvas = largeCms ? buildCanvas(img, effW, effH, longEdge, rotate, largeCms) : null;
 
         // --- UI反映 ---
-        function setCard(key, imgEl, saveBtn, labelEl, canvas, sizes) {
-          const card = imgEl.closest('.output-card');
+        function setCard(key, previewCanvas, saveBtn, labelEl, canvas, sizes) {
+          const card = previewCanvas.closest('.output-card');
           if (canvas && sizes && sizes.length > 0) {
             const previousUrl = renderedUrls[key];
             renderedFiles[key] = null;
             saveBtn.disabled = true;
             card.style.display = 'block';
             labelEl.textContent = `長辺：${sizes.map(formatMmFromCm).join(' / ')}`;
-            // 高解像度PNGを同期・二重変換せず、1回だけ非同期生成する。
+
+            // プレビューはCanvasへ直接表示し、料金はこの画面用Canvasだけに描く。
+            previewCanvas.width = canvas.width;
+            previewCanvas.height = canvas.height;
+            const previewCtx = previewCanvas.getContext('2d', { alpha: false });
+            previewCtx.drawImage(canvas, 0, 0);
+            drawScreenPrices(previewCtx, effW, effH, longEdge, sizes);
+
+            // canvas本体には料金がないため、保存ファイルにも料金は含まれない。
             canvas.toBlob((blob) => {
               if (!blob || revision !== renderRevision) return;
               if (previousUrl && previousUrl.startsWith('blob:')) URL.revokeObjectURL(previousUrl);
               const url = URL.createObjectURL(blob);
-              imgEl.src = url;
               renderedUrls[key] = url;
               renderedFiles[key] = new File([blob], `stencil_${key}.png`, { type: 'image/png' });
               saveBtn.disabled = false;
