@@ -242,7 +242,7 @@
     </div>
   </div>
 
-  <div class="app-version">v16</div>
+  <div class="app-version">v17</div>
 
   <script>
     'use strict';
@@ -968,7 +968,7 @@
       // 各行：入る枚数を自動計算し、行ごとに独立して中央配置する。
       let curY = PAGE_PAD;
       for (let row = 0; row < rows.length; row++) {
-        const { w, h, itemW, itemH } = rows[row];
+        const { cm, w, h, itemW, itemH } = rows[row];
         const nCols = MAX_COLS >= 2 && itemW * 2 + COL_GAP <= CONTENT_W ? 2 : 1;
         const totalRowW = itemW * nCols + COL_GAP * (nCols - 1);
         const startX = PAGE_PAD + Math.floor((CONTENT_W - totalRowW) / 2);
