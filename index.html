@@ -253,7 +253,7 @@
     </div>
   </div>
 
-  <div class="app-version">v18</div>
+  <div class="app-version">v19</div>
 
   <script>
     'use strict';
@@ -348,7 +348,7 @@
     function formatPrice(value) {
       if (value === null) return '';
       if (typeof value !== 'number') return value;
-      return value.toLocaleString('ja-JP');
+      return `${Math.round(value / 1000)},`;
     }
 
     // --- UI ---
@@ -398,17 +398,17 @@
       fileInput.value = ''; // 同じ画像を続けて選び直してもchangeを発生させる
       if (f) handleFile(f);
     });
-    $id('baseMm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(); });
+    $id('baseMm').addEventListener('input', () => { if (currentDataURL) scheduleGenerate(160); });
     let stepIsAutomatic = true;
     $id('stepMm').addEventListener('input', () => {
       stepIsAutomatic = $id('stepMm').value.trim() === '';
-      if (currentDataURL) scheduleGenerate();
+      if (currentDataURL) scheduleGenerate(160);
     });
     for (const id of ['priceWhitespace', 'priceComplexity', 'priceColor']) {
-      $id(id).addEventListener('change', () => { if (currentDataURL) scheduleGenerate(); });
+      $id(id).addEventListener('change', () => { if (currentDataURL) scheduleGenerate(0); });
     }
 
-    let currentDataURL = null, generateTimer = null, fileLoadId = 0;
+    let currentDataURL = null, generateTimer = null, fileLoadId = 0, renderRevision = 0;
     let currentWasCropped = false;
     let originalDataURL = null, currentCropRect = null, autoCropRect = null;
     const renderedFiles = { main: null, small: null, large: null };
@@ -475,9 +475,9 @@
       reader.readAsDataURL(file);
     }
 
-    function scheduleGenerate() {
+    function scheduleGenerate(delay = 160) {
       clearTimeout(generateTimer);
-      generateTimer = setTimeout(generate, 300);
+      generateTimer = setTimeout(generate, delay);
     }
 
     function showStatus(msg, isError = false) {
@@ -832,7 +832,7 @@
 
       // 実寸値は白抜きで読みやすくし、定規の帯を太くしない。
       const priceLabel = formatPrice(price);
-      const topLabel = formatMm(widthMm) + (widthMm >= heightMm && priceLabel ? `  ${priceLabel}` : '');
+      const topLabel = formatMm(widthMm) + (widthMm <= heightMm && priceLabel ? `  ${priceLabel}` : '');
       const topWidth = ctx.measureText(topLabel).width;
       const topX = x + w / 2;
       const topY = horizontalY - fontSize * 0.2;
@@ -841,7 +841,7 @@
       ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillText(topLabel, topX, topY);
 
-      const sideLabel = formatMm(heightMm) + (heightMm > widthMm && priceLabel ? `  ${priceLabel}` : '');
+      const sideLabel = formatMm(heightMm) + (heightMm < widthMm && priceLabel ? `  ${priceLabel}` : '');
       const sideWidth = ctx.measureText(sideLabel).width;
       const sideX = verticalX - fontSize * 0.2;
       const sideY = y + h / 2;
@@ -1005,6 +1005,7 @@
     // =====================================================
     async function generate() {
       if (!currentDataURL) return;
+      const revision = ++renderRevision;
 
       const baseMm = parseFloat($id('baseMm').value);
       const baseCm = baseMm / 10;
@@ -1065,21 +1066,27 @@
         function setCard(key, imgEl, saveBtn, labelEl, canvas, sizes) {
           const card = imgEl.closest('.output-card');
           if (canvas && sizes && sizes.length > 0) {
-            const url = canvas.toDataURL('image/png');
-            imgEl.src = url;
-            renderedUrls[key] = url;
+            const previousUrl = renderedUrls[key];
             renderedFiles[key] = null;
             saveBtn.disabled = true;
+            card.style.display = 'block';
+            labelEl.textContent = `長辺：${sizes.map(formatMmFromCm).join(' / ')}`;
+            // 高解像度PNGを同期・二重変換せず、1回だけ非同期生成する。
             canvas.toBlob((blob) => {
-              if (!blob) return;
+              if (!blob || revision !== renderRevision) return;
+              if (previousUrl && previousUrl.startsWith('blob:')) URL.revokeObjectURL(previousUrl);
+              const url = URL.createObjectURL(blob);
+              imgEl.src = url;
+              renderedUrls[key] = url;
               renderedFiles[key] = new File([blob], `stencil_${key}.png`, { type: 'image/png' });
               saveBtn.disabled = false;
             }, 'image/png');
-            card.style.display = 'block';
-            labelEl.textContent = `長辺：${sizes.map(formatMmFromCm).join(' / ')}`;
           } else {
             card.style.display = 'none';
             renderedFiles[key] = null;
+            if (renderedUrls[key] && renderedUrls[key].startsWith('blob:')) {
+              URL.revokeObjectURL(renderedUrls[key]);
+            }
             renderedUrls[key] = null;
           }
         }
