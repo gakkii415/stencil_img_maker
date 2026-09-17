@@ -71,6 +71,20 @@
       font-size: 13px; font-weight: 700;
     }
     .crop-actions #cropApplyBtn { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .tone-control {
+      margin-top: 12px; padding: 12px 2px 4px;
+      border-top: 1px solid var(--line);
+    }
+    .tone-control-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 6px; color: var(--ink); font-size: 13px; font-weight: 700;
+    }
+    #midtoneValue { color: var(--muted); font-variant-numeric: tabular-nums; }
+    #midtoneSlider { width: 100%; margin: 0; accent-color: var(--accent); }
+    .tone-control-scale {
+      display: flex; justify-content: space-between; margin-top: 2px;
+      color: var(--muted); font-size: 10px;
+    }
     .tool-panel {
       margin-bottom: 16px; padding: 16px 0;
       border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fff;
@@ -166,6 +180,14 @@
         <button id="cropAutoBtn" type="button">自動範囲</button>
         <button id="cropFullBtn" type="button">画像全体</button>
       </div>
+      <div class="tone-control">
+        <div class="tone-control-head">
+          <span>中間調</span>
+          <span id="midtoneValue">0</span>
+        </div>
+        <input id="midtoneSlider" type="range" min="-100" max="100" value="0" step="1" aria-label="中間調" />
+        <div class="tone-control-scale"><span>暗く</span><span>明るく</span></div>
+      </div>
       <div class="crop-actions">
         <button id="cropApplyBtn" type="button">この範囲を適用</button>
       </div>
@@ -253,7 +275,7 @@
     </div>
   </div>
 
-  <div class="app-version">v24</div>
+  <div class="app-version">v25</div>
 
   <script>
     'use strict';
@@ -429,7 +451,8 @@
       $id(id).addEventListener('change', () => { if (currentDataURL) scheduleGenerate(0); });
     }
 
-    let currentDataURL = null, generateTimer = null, exportTimer = null, fileLoadId = 0, renderRevision = 0;
+    let currentDataURL = null, currentBaseDataURL = null;
+    let generateTimer = null, exportTimer = null, toneTimer = null, fileLoadId = 0, renderRevision = 0, toneRevision = 0;
     let currentWasCropped = false;
     let originalDataURL = null, currentCropRect = null, autoCropRect = null;
     const renderedFiles = { main: null, small: null, large: null };
@@ -455,6 +478,65 @@
       showStatus('開いた画像を長押しして「写真に保存」を選択してください');
     }
 
+    const midtoneSlider = $id('midtoneSlider');
+    const midtoneValue = $id('midtoneValue');
+    let midtoneAmount = 0;
+
+    function updateMidtoneLabel() {
+      midtoneValue.textContent = midtoneAmount > 0 ? `+${midtoneAmount}` : String(midtoneAmount);
+    }
+
+    function buildToneCanvasFromImage(img, amount, maxSide = 4096) {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.max(1, Math.round(img.naturalWidth * scale));
+      const height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true, alpha: false });
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      const gamma = Math.exp(-amount / 95);
+      const lut = new Uint8ClampedArray(256);
+      for (let i = 0; i < 256; i++) lut[i] = Math.round(Math.pow(i / 255, gamma) * 255);
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round(data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722);
+        const value = lut[gray];
+        data[i] = value; data[i + 1] = value; data[i + 2] = value; data[i + 3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+
+    async function applyMonochromeMidtone(dataURL, amount) {
+      const img = await loadImage(dataURL);
+      return buildToneCanvasFromImage(img, amount, 4096).toDataURL('image/png');
+    }
+
+    async function refreshToneFromBase() {
+      if (!currentBaseDataURL) return;
+      const revision = ++toneRevision;
+      const adjusted = await applyMonochromeMidtone(currentBaseDataURL, midtoneAmount);
+      if (revision !== toneRevision) return;
+      currentDataURL = adjusted;
+      scheduleGenerate(0);
+    }
+
+    function scheduleToneRefresh(delay = 70) {
+      clearTimeout(toneTimer);
+      toneTimer = setTimeout(() => refreshToneFromBase(), delay);
+    }
+
+    midtoneSlider.addEventListener('input', () => {
+      midtoneAmount = Number(midtoneSlider.value) || 0;
+      updateMidtoneLabel();
+      rebuildEditorTonePreview();
+      drawCropEditor();
+      if (currentBaseDataURL) scheduleToneRefresh();
+    });
+    updateMidtoneLabel();
+
     function handleFile(file) {
       const loadId = ++fileLoadId;
       dropZone.classList.add('has-file');
@@ -467,7 +549,9 @@
         try {
           const result = await autoCropDataURL(originalDataURL);
           if (loadId !== fileLoadId) return;
-          currentDataURL = result.dataURL;
+          currentBaseDataURL = result.dataURL;
+          currentDataURL = await applyMonochromeMidtone(currentBaseDataURL, midtoneAmount);
+          if (loadId !== fileLoadId) return;
           currentWasCropped = result.cropped;
           currentCropRect = { ...result.cropRect };
           autoCropRect = { ...result.cropRect };
@@ -483,7 +567,9 @@
           const original = await loadImage(originalDataURL);
           if (loadId !== fileLoadId) return;
           const fullRect = { x: 0, y: 0, w: original.naturalWidth, h: original.naturalHeight };
-          currentDataURL = originalDataURL;
+          currentBaseDataURL = originalDataURL;
+          currentDataURL = await applyMonochromeMidtone(currentBaseDataURL, midtoneAmount);
+          if (loadId !== fileLoadId) return;
           currentWasCropped = false;
           currentCropRect = { ...fullRect };
           autoCropRect = { ...fullRect };
@@ -646,7 +732,7 @@
     // --- 手動トリミング（必要なときだけ開く） ---
     const cropSection = $id('cropSection');
     const cropCanvas = $id('cropCanvas');
-    let editorImage = null, editorRect = null, editorDrag = null;
+    let editorImage = null, editorTonePreview = null, editorRect = null, editorDrag = null;
     let editorView = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1, dpr: 1 };
 
     cropSection.addEventListener('toggle', () => {
@@ -676,7 +762,8 @@
       };
       currentCropRect.w = Math.min(currentCropRect.w, iw - currentCropRect.x);
       currentCropRect.h = Math.min(currentCropRect.h, ih - currentCropRect.y);
-      currentDataURL = cropLoadedImage(editorImage, currentCropRect);
+      currentBaseDataURL = cropLoadedImage(editorImage, currentCropRect);
+      currentDataURL = await applyMonochromeMidtone(currentBaseDataURL, midtoneAmount);
       currentWasCropped = !isFullCrop(currentCropRect, iw, ih);
       dropZone.querySelector('.sub-text').textContent = currentWasCropped
         ? 'トリミング調整済み・タップで画像変更'
@@ -689,6 +776,7 @@
     async function openCropEditor() {
       if (!originalDataURL || !currentCropRect) return;
       editorImage = await loadImage(originalDataURL);
+      editorTonePreview = buildToneCanvasFromImage(editorImage, midtoneAmount, 1600);
       editorRect = { ...currentCropRect };
       syncOrientationFromCropRect();
       requestAnimationFrame(sizeCropCanvas);
@@ -697,6 +785,11 @@
     function syncOrientationFromCropRect() {
       if (!editorRect) return;
       setAutomaticPlacementFromDimensions(editorRect.w, editorRect.h);
+    }
+
+    function rebuildEditorTonePreview() {
+      if (!editorImage) return;
+      editorTonePreview = buildToneCanvasFromImage(editorImage, midtoneAmount, 1600);
     }
 
     function sizeCropCanvas() {
@@ -745,7 +838,7 @@
       ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
       ctx.fillStyle = '#171a20';
       ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
-      ctx.drawImage(editorImage, offsetX, offsetY, imageW, imageH);
+      ctx.drawImage(editorTonePreview || editorImage, offsetX, offsetY, imageW, imageH);
       ctx.fillStyle = 'rgba(0,0,0,.58)';
       ctx.fillRect(offsetX, offsetY, imageW, y - offsetY);
       ctx.fillRect(offsetX, y + h, imageW, offsetY + imageH - y - h);
