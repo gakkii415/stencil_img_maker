@@ -71,6 +71,35 @@
       font-size: 13px; font-weight: 700;
     }
     .crop-actions #cropApplyBtn { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .adjustment-label {
+      margin: 2px 0 7px; color: var(--muted); font-size: 11px; font-weight: 700;
+    }
+    .tone-control {
+      margin-top: 12px; padding: 12px 0 4px;
+      border-top: 1px solid var(--line);
+    }
+    .tone-control-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin-bottom: 8px; color: var(--ink); font-size: 13px; font-weight: 700;
+    }
+    .tone-actions { display: flex; gap: 6px; }
+    .tone-actions button {
+      min-height: 32px; padding: 6px 9px; cursor: pointer;
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
+      font-size: 11px; font-weight: 700;
+    }
+    .tone-actions button:disabled { opacity: .35; cursor: default; }
+    .tone-curve-shell {
+      padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+    }
+    #toneCurveCanvas {
+      display: block; width: 100%; height: auto; touch-action: none;
+      border-radius: 5px; background: #fff;
+    }
+    .tone-control-scale {
+      display: flex; justify-content: space-between; margin-top: 5px;
+      color: var(--muted); font-size: 10px;
+    }
     .tool-panel {
       margin-bottom: 16px; padding: 16px 0;
       border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #fff;
@@ -159,15 +188,29 @@
   <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif" />
 
   <details class="crop-section" id="cropSection">
-    <summary>トリミング</summary>
+    <summary>画像調整</summary>
     <div class="crop-content">
+      <div class="adjustment-label">トリミング</div>
       <div class="crop-stage"><canvas id="cropCanvas"></canvas></div>
       <div class="crop-tools">
         <button id="cropAutoBtn" type="button">自動範囲</button>
         <button id="cropFullBtn" type="button">画像全体</button>
       </div>
+      <div class="tone-control">
+        <div class="tone-control-head">
+          <span>トーンカーブ</span>
+          <span class="tone-actions">
+            <button id="toneDeleteBtn" type="button" disabled>点を削除</button>
+            <button id="toneResetBtn" type="button">リセット</button>
+          </span>
+        </div>
+        <div class="tone-curve-shell">
+          <canvas id="toneCurveCanvas" width="320" height="220" aria-label="トーンカーブ"></canvas>
+        </div>
+        <div class="tone-control-scale"><span>黒</span><span>入力階調</span><span>白</span></div>
+      </div>
       <div class="crop-actions">
-        <button id="cropApplyBtn" type="button">この範囲を適用</button>
+        <button id="cropApplyBtn" type="button">この調整を適用</button>
       </div>
     </div>
   </details>
@@ -253,7 +296,7 @@
     </div>
   </div>
 
-  <div class="app-version">v24</div>
+  <div class="app-version">v27</div>
 
   <script>
     'use strict';
@@ -429,7 +472,8 @@
       $id(id).addEventListener('change', () => { if (currentDataURL) scheduleGenerate(0); });
     }
 
-    let currentDataURL = null, generateTimer = null, exportTimer = null, fileLoadId = 0, renderRevision = 0;
+    let currentDataURL = null, currentBaseDataURL = null;
+    let generateTimer = null, exportTimer = null, toneTimer = null, fileLoadId = 0, renderRevision = 0, toneRevision = 0;
     let currentWasCropped = false;
     let originalDataURL = null, currentCropRect = null, autoCropRect = null;
     const renderedFiles = { main: null, small: null, large: null };
@@ -455,6 +499,284 @@
       showStatus('開いた画像を長押しして「写真に保存」を選択してください');
     }
 
+    const toneCurveCanvas = $id('toneCurveCanvas');
+    const toneResetBtn = $id('toneResetBtn');
+    const toneDeleteBtn = $id('toneDeleteBtn');
+    const toneCurveCtx = toneCurveCanvas.getContext('2d');
+    const TONE_PAD = 18;
+    const TONE_HIT_PX = 18;
+    const TONE_MIN_X_GAP = 3;
+    let toneCurvePoints = [
+      { x: 0, y: 0 },
+      { x: 255, y: 255 }
+    ];
+    let toneSelectedIndex = null;
+    let toneDragging = false;
+    let tonePreviewRaf = null;
+    let toneCurveLut = new Uint8ClampedArray(256);
+
+    function clampTone(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function toneCanvasX(value) {
+      const width = toneCurveCanvas.width - TONE_PAD * 2;
+      return TONE_PAD + width * (value / 255);
+    }
+
+    function toneCanvasY(value) {
+      const height = toneCurveCanvas.height - TONE_PAD * 2;
+      return toneCurveCanvas.height - TONE_PAD - height * (value / 255);
+    }
+
+    function toneValueX(canvasX) {
+      const width = toneCurveCanvas.width - TONE_PAD * 2;
+      return clampTone((canvasX - TONE_PAD) / width * 255, 0, 255);
+    }
+
+    function toneValueY(canvasY) {
+      const height = toneCurveCanvas.height - TONE_PAD * 2;
+      return clampTone((toneCurveCanvas.height - TONE_PAD - canvasY) / height * 255, 0, 255);
+    }
+
+    function tonePointer(event) {
+      const rect = toneCurveCanvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * toneCurveCanvas.width / rect.width,
+        y: (event.clientY - rect.top) * toneCurveCanvas.height / rect.height
+      };
+    }
+
+    function sortTonePoints() {
+      toneCurvePoints.sort((a, b) => a.x - b.x);
+      toneCurvePoints[0].x = 0;
+      toneCurvePoints[toneCurvePoints.length - 1].x = 255;
+    }
+
+    function toneSlope(index) {
+      const points = toneCurvePoints;
+      if (index <= 0) {
+        const dx = Math.max(1, points[1].x - points[0].x);
+        return (points[1].y - points[0].y) / dx;
+      }
+      if (index >= points.length - 1) {
+        const last = points.length - 1;
+        const dx = Math.max(1, points[last].x - points[last - 1].x);
+        return (points[last].y - points[last - 1].y) / dx;
+      }
+      const dx = Math.max(1, points[index + 1].x - points[index - 1].x);
+      return (points[index + 1].y - points[index - 1].y) / dx;
+    }
+
+    function rebuildToneLut() {
+      sortTonePoints();
+      const lut = new Uint8ClampedArray(256);
+      let segment = 0;
+      for (let x = 0; x < 256; x++) {
+        while (segment < toneCurvePoints.length - 2 && x > toneCurvePoints[segment + 1].x) segment++;
+        const p0 = toneCurvePoints[segment];
+        const p1 = toneCurvePoints[segment + 1];
+        const dx = Math.max(1, p1.x - p0.x);
+        const t = clampTone((x - p0.x) / dx, 0, 1);
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const m0 = toneSlope(segment) * dx;
+        const m1 = toneSlope(segment + 1) * dx;
+        const h00 = 2 * t3 - 3 * t2 + 1;
+        const h10 = t3 - 2 * t2 + t;
+        const h01 = -2 * t3 + 3 * t2;
+        const h11 = t3 - t2;
+        const y = h00 * p0.y + h10 * m0 + h01 * p1.y + h11 * m1;
+        lut[x] = Math.round(clampTone(y, 0, 255));
+      }
+      toneCurveLut = lut;
+    }
+
+    function drawToneCurve() {
+      const ctx = toneCurveCtx;
+      const width = toneCurveCanvas.width;
+      const height = toneCurveCanvas.height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const gx = TONE_PAD + (width - TONE_PAD * 2) * i / 4;
+        const gy = TONE_PAD + (height - TONE_PAD * 2) * i / 4;
+        ctx.beginPath(); ctx.moveTo(gx, TONE_PAD); ctx.lineTo(gx, height - TONE_PAD); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(TONE_PAD, gy); ctx.lineTo(width - TONE_PAD, gy); ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#c4cad4';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(toneCanvasX(0), toneCanvasY(0));
+      ctx.lineTo(toneCanvasX(255), toneCanvasY(255));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = '#155eef';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let x = 0; x < 256; x++) {
+        const cx = toneCanvasX(x);
+        const cy = toneCanvasY(toneCurveLut[x]);
+        if (x === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+
+      toneCurvePoints.forEach((point, index) => {
+        ctx.beginPath();
+        ctx.arc(toneCanvasX(point.x), toneCanvasY(point.y), index === toneSelectedIndex ? 8 : 6, 0, Math.PI * 2);
+        ctx.fillStyle = index === toneSelectedIndex ? '#155eef' : '#fff';
+        ctx.strokeStyle = '#155eef';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+      });
+      toneDeleteBtn.disabled = toneSelectedIndex == null || toneSelectedIndex === 0 || toneSelectedIndex === toneCurvePoints.length - 1;
+    }
+
+    function nearestTonePoint(canvasX, canvasY) {
+      let best = null;
+      let bestDistance = Infinity;
+      toneCurvePoints.forEach((point, index) => {
+        const distance = Math.hypot(canvasX - toneCanvasX(point.x), canvasY - toneCanvasY(point.y));
+        if (distance < bestDistance && distance <= TONE_HIT_PX) {
+          bestDistance = distance;
+          best = index;
+        }
+      });
+      return best;
+    }
+
+    function scheduleEditorTonePreview() {
+      if (tonePreviewRaf !== null) return;
+      tonePreviewRaf = requestAnimationFrame(() => {
+        tonePreviewRaf = null;
+        rebuildEditorTonePreview();
+        drawCropEditor();
+      });
+    }
+
+    function refreshToneEditorPreview() {
+      // ドラッグ中は低解像度プレビューだけ更新する。
+      // A4出力用の高解像度再生成は「この調整を適用」を押したときだけ行う。
+      rebuildToneLut();
+      drawToneCurve();
+      scheduleEditorTonePreview();
+    }
+
+    toneCurveCanvas.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const point = tonePointer(event);
+      let index = nearestTonePoint(point.x, point.y);
+      if (index == null) {
+        const created = { x: toneValueX(point.x), y: toneValueY(point.y) };
+        toneCurvePoints.push(created);
+        sortTonePoints();
+        index = toneCurvePoints.indexOf(created);
+      }
+      toneSelectedIndex = index;
+      toneDragging = true;
+      toneCurveCanvas.setPointerCapture(event.pointerId);
+      refreshToneEditorPreview();
+    });
+
+    toneCurveCanvas.addEventListener('pointermove', (event) => {
+      if (!toneDragging || toneSelectedIndex == null) return;
+      event.preventDefault();
+      const point = tonePointer(event);
+      const lastIndex = toneCurvePoints.length - 1;
+      const current = toneCurvePoints[toneSelectedIndex];
+      current.y = toneValueY(point.y);
+      if (toneSelectedIndex !== 0 && toneSelectedIndex !== lastIndex) {
+        const minX = toneCurvePoints[toneSelectedIndex - 1].x + TONE_MIN_X_GAP;
+        const maxX = toneCurvePoints[toneSelectedIndex + 1].x - TONE_MIN_X_GAP;
+        current.x = clampTone(toneValueX(point.x), minX, maxX);
+      }
+      refreshToneEditorPreview();
+    });
+
+    function endToneDrag() {
+      toneDragging = false;
+    }
+    toneCurveCanvas.addEventListener('pointerup', endToneDrag);
+    toneCurveCanvas.addEventListener('pointercancel', endToneDrag);
+
+    toneResetBtn.addEventListener('click', () => {
+      toneCurvePoints = [{ x: 0, y: 0 }, { x: 255, y: 255 }];
+      toneSelectedIndex = null;
+      refreshToneEditorPreview();
+    });
+
+    toneDeleteBtn.addEventListener('click', () => {
+      if (toneSelectedIndex == null || toneSelectedIndex === 0 || toneSelectedIndex === toneCurvePoints.length - 1) return;
+      toneCurvePoints.splice(toneSelectedIndex, 1);
+      toneSelectedIndex = null;
+      refreshToneEditorPreview();
+    });
+
+    function buildToneCanvasFromImage(img, maxSide = 4096) {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.max(1, Math.round(img.naturalWidth * scale));
+      const height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true, alpha: false });
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round(data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722);
+        const value = toneCurveLut[gray];
+        data[i] = value;
+        data[i + 1] = value;
+        data[i + 2] = value;
+        data[i + 3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+
+    function toneCurveIsIdentity() {
+      for (let i = 0; i < 256; i++) {
+        if (toneCurveLut[i] !== i) return false;
+      }
+      return true;
+    }
+
+    async function applyToneCurve(dataURL) {
+      // 無加工ならデコード・全画素処理・PNG再エンコードを丸ごと省略する。
+      if (toneCurveIsIdentity()) return dataURL;
+      const img = await loadImage(dataURL);
+      // アプリの最大印刷サイズ（A4付近/300dpi）を十分カバーしつつ、4096px処理を避ける。
+      return buildToneCanvasFromImage(img, 3400).toDataURL('image/png');
+    }
+
+    async function refreshToneFromBase() {
+      if (!currentBaseDataURL) return;
+      const revision = ++toneRevision;
+      const adjusted = await applyToneCurve(currentBaseDataURL);
+      if (revision !== toneRevision) return;
+      currentDataURL = adjusted;
+      scheduleGenerate(0);
+    }
+
+    function scheduleToneRefresh(delay = 80) {
+      clearTimeout(toneTimer);
+      toneTimer = setTimeout(() => refreshToneFromBase(), delay);
+    }
+
+    rebuildToneLut();
+    drawToneCurve();
+
     function handleFile(file) {
       const loadId = ++fileLoadId;
       dropZone.classList.add('has-file');
@@ -467,7 +789,9 @@
         try {
           const result = await autoCropDataURL(originalDataURL);
           if (loadId !== fileLoadId) return;
-          currentDataURL = result.dataURL;
+          currentBaseDataURL = result.dataURL;
+          currentDataURL = await applyToneCurve(currentBaseDataURL);
+          if (loadId !== fileLoadId) return;
           currentWasCropped = result.cropped;
           currentCropRect = { ...result.cropRect };
           autoCropRect = { ...result.cropRect };
@@ -483,7 +807,9 @@
           const original = await loadImage(originalDataURL);
           if (loadId !== fileLoadId) return;
           const fullRect = { x: 0, y: 0, w: original.naturalWidth, h: original.naturalHeight };
-          currentDataURL = originalDataURL;
+          currentBaseDataURL = originalDataURL;
+          currentDataURL = await applyToneCurve(currentBaseDataURL);
+          if (loadId !== fileLoadId) return;
           currentWasCropped = false;
           currentCropRect = { ...fullRect };
           autoCropRect = { ...fullRect };
@@ -646,7 +972,7 @@
     // --- 手動トリミング（必要なときだけ開く） ---
     const cropSection = $id('cropSection');
     const cropCanvas = $id('cropCanvas');
-    let editorImage = null, editorRect = null, editorDrag = null;
+    let editorImage = null, editorToneSource = null, editorTonePreview = null, editorRect = null, editorDrag = null;
     let editorView = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1, dpr: 1 };
 
     cropSection.addEventListener('toggle', () => {
@@ -676,7 +1002,8 @@
       };
       currentCropRect.w = Math.min(currentCropRect.w, iw - currentCropRect.x);
       currentCropRect.h = Math.min(currentCropRect.h, ih - currentCropRect.y);
-      currentDataURL = cropLoadedImage(editorImage, currentCropRect);
+      currentBaseDataURL = cropLoadedImage(editorImage, currentCropRect);
+      currentDataURL = await applyToneCurve(currentBaseDataURL);
       currentWasCropped = !isFullCrop(currentCropRect, iw, ih);
       dropZone.querySelector('.sub-text').textContent = currentWasCropped
         ? 'トリミング調整済み・タップで画像変更'
@@ -689,6 +1016,10 @@
     async function openCropEditor() {
       if (!originalDataURL || !currentCropRect) return;
       editorImage = await loadImage(originalDataURL);
+      // iPhone上の操作用プレビューは画面解像度に十分な512pxだけ保持する。
+      // グレースケール化はここで1回だけ行い、ドラッグ中はLUTだけ差し替える。
+      editorToneSource = buildEditorToneSource(editorImage, 512);
+      rebuildEditorTonePreview();
       editorRect = { ...currentCropRect };
       syncOrientationFromCropRect();
       requestAnimationFrame(sizeCropCanvas);
@@ -697,6 +1028,46 @@
     function syncOrientationFromCropRect() {
       if (!editorRect) return;
       setAutomaticPlacementFromDimensions(editorRect.w, editorRect.h);
+    }
+
+    function buildEditorToneSource(img, maxSide = 512) {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.max(1, Math.round(img.naturalWidth * scale));
+      const height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true, alpha: false });
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      const data = ctx.getImageData(0, 0, width, height).data;
+      const gray = new Uint8ClampedArray(width * height);
+      for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
+        gray[p] = Math.round(data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722);
+      }
+      return { width, height, gray };
+    }
+
+    function rebuildEditorTonePreview() {
+      if (!editorToneSource) return;
+      const { width, height, gray } = editorToneSource;
+      if (!editorTonePreview || editorTonePreview.width !== width || editorTonePreview.height !== height) {
+        editorTonePreview = document.createElement('canvas');
+        editorTonePreview.width = width;
+        editorTonePreview.height = height;
+      }
+      const ctx = editorTonePreview.getContext('2d', { willReadFrequently: true, alpha: false });
+      const imageData = ctx.createImageData(width, height);
+      const data = imageData.data;
+      for (let p = 0, i = 0; p < gray.length; p++, i += 4) {
+        const value = toneCurveLut[gray[p]];
+        data[i] = value;
+        data[i + 1] = value;
+        data[i + 2] = value;
+        data[i + 3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
     }
 
     function sizeCropCanvas() {
@@ -745,7 +1116,7 @@
       ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
       ctx.fillStyle = '#171a20';
       ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
-      ctx.drawImage(editorImage, offsetX, offsetY, imageW, imageH);
+      ctx.drawImage(editorTonePreview || editorImage, offsetX, offsetY, imageW, imageH);
       ctx.fillStyle = 'rgba(0,0,0,.58)';
       ctx.fillRect(offsetX, offsetY, imageW, y - offsetY);
       ctx.fillRect(offsetX, y + h, imageW, offsetY + imageH - y - h);
